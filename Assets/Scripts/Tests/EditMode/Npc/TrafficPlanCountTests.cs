@@ -505,13 +505,15 @@ namespace GoF2Remake.Tests
             Repeat(120, 500, 832, list => Assert.IsFalse(list.Exists(s => s.derelict), "disabled for this system"));
 
             system.derelictFreighters = true;
-            Settings.DerelictWrecks = false;
-            Repeat(120, 500, 833, list => Assert.IsFalse(list.Exists(s => s.derelict), "global gameplay option is the master switch"));
-
+            system.ambientPopulation = 0f;
             Settings.DerelictWrecks = true;
             int wrecks = 0;
-            Repeat(120, 1000, 834, list => { if (list.Exists(s => s.derelict)) wrecks++; });
-            Assert.Greater(wrecks, 0, "enabled per-system and globally");
+            Repeat(120, 1000, 833, list => { if (list.Exists(s => s.derelict)) wrecks++; });
+            Assert.Greater(wrecks, 0, "derelict toggle is independent of ambient population");
+
+            system.ambientPopulation = 1f;
+            Settings.DerelictWrecks = false;
+            Repeat(120, 500, 834, list => Assert.IsFalse(list.Exists(s => s.derelict), "global gameplay option is the master switch"));
         }
 
     }
