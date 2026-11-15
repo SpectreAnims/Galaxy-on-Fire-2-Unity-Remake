@@ -10,7 +10,7 @@ Both fields work on new systems and system overrides and are exposed in the Mod 
 
 Population scaling applies to local patrols, jumpers, freighters, raider groups, pirate-base escorts, the special pirate-orbit groups, random big battles, random capital-ship specials and fleet battles, random derelict escorts, and mod NPC types whose spawn rules place them as ambient traffic. A zero population suppresses random ambient spawns, including random derelicts and mod blueprint derelict rolls.
 
-It does not remove mission/story ships, event-graph spawns, explicit scripted mod spawns, pirate events, siege/rift encounters or other content whose spawn is explicitly requested by gameplay logic. This is implemented at traffic-plan generation points, not by a global NPC cap or despawn sweep.
+It does not remove mission/story ships, event-graph spawns, explicit scripted mod spawns, reported pirate sightings, siege/rift encounters or other content whose spawn is explicitly requested by gameplay logic. The separate unreported random pirate-event roll is also suppressed at population zero. This is implemented at traffic-plan generation points, not by a global NPC cap or despawn sweep.
 
 ## Multiplayer
 

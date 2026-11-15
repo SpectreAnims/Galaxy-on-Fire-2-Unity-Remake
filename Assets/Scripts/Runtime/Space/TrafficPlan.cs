@@ -488,7 +488,7 @@ namespace GoF2Remake.Flight
                 for (int i = 0; i < specters; i++)
                     list.Add(new SpawnSpec { group = NpcGroup.Special, race = Standing.Specter, ship = 44, alwaysEnemy = true, position = sp + Jitter() });
             }
-            AddPirateEvent(list, db, station, system, secEff, story, cm, baseSystem, raiders > 0);
+            AddPirateEvent(list, db, station, system, secEff, story, cm, baseSystem, raiders > 0, population > 0f);
             return list;
         }
 
