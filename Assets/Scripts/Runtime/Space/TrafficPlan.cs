@@ -254,12 +254,11 @@ namespace GoF2Remake.Flight
             // Remember whether vanilla's random ambient plan had anything before scaling. If all positive counts
             // stochastic-round down to zero, that must stay an empty orbit rather than invoking the vanilla
             // empty-orbit patrol fallback and adding ships back.
-            int unscaledAmbientCount = jumpers + local + freighters + raiders;
             // An attacked station's extra patrols are ambient too: apply the vanilla minimum before population scaling.
             if (Session.AttackedStations.Contains(station)) local = Mathf.Max(local, 7);
             // The "big battle" is random ambient traffic too, so population zero suppresses its roll.
             if (population > 0f && raidersOn && cm > 0x1f && Random.Range(0, 100) < 8) raiders = local = 9;
-            unscaledAmbientCount = jumpers + local + freighters + raiders;
+            int unscaledAmbientCount = jumpers + local + freighters + raiders;
             raiders = ScaleAmbientCount(raiders, population);
             jumpers = ScaleAmbientCount(jumpers, population);
             local = ScaleAmbientCount(local, population);
