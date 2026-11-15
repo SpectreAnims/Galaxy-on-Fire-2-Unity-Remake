@@ -205,6 +205,42 @@ namespace GoF2Remake.Tests
             });
         }
 
+        [Test]
+        public void ZeroPopulationDoesNotRestoreTheEmptyOrbitPatrolFallback()
+        {
+            InFreePlay(0);
+            var system = SystemOf(78);
+            system.ambientPopulation = 0f;
+            system.derelictFreighters = false;
+            Repeat(78, 100, 1901, list =>
+            {
+                var counts = CountGroups(list);
+                Assert.AreEqual(0, counts.local + counts.jumpers + counts.freighters + counts.raiders);
+            });
+        }
+
+        [Test]
+        public void DerelictFreightersRemainIndependentOfAmbientPopulation()
+        {
+            InFreePlay(0);
+            var system = SystemOf(20);
+            system.ambientPopulation = 0f;
+            system.derelictFreighters = true;
+            Settings.DerelictWrecks = true;
+            int wrecks = 0;
+            Repeat(20, 500, 1902, list =>
+            {
+                wrecks += list.Count(s => s.derelict);
+                var counts = CountGroups(list);
+                Assert.AreEqual(0, counts.local + counts.jumpers + counts.freighters + counts.raiders,
+                    "zero ambient population must not restore ordinary traffic");
+            });
+            Assert.Greater(wrecks, 0, "the independent per-system derelict toggle should still permit random wrecks");
+
+            system.derelictFreighters = false;
+            Repeat(20, 100, 1903, list => Assert.IsFalse(list.Exists(s => s.derelict)));
+        }
+
         // ---- difficulty ----------------------------------------------------------------------------------------
 
         [Test]
