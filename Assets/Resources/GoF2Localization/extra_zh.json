@@ -3618,5 +3618,10 @@
  "mpScriptsNotAllowed": "该游戏使用了你尚未允许的脚本模组：{0}。请先在“模组”中开启一次以允许其脚本，然后重新加入。",
  "mpScriptsShort": "请先允许其脚本：{0}",
  "mpModsCountScripts": "模组（{0}个已开启，含脚本）",
- "scriptNoCommand": "没有命令“{0}”。"
+ "scriptNoCommand": "没有命令“{0}”。",
+ "mbPopulation": "环境 NPC 数量",
+ "mbPopulationScale": "交通倍率（0 = 无，1 = 正常，2 = 双倍）",
+ "mbPopulationNote": "调整随机环境交通和随机特殊遭遇。任务及明确由脚本生成的遭遇不受影响。",
+ "mbDerelictFreighters": "随机废弃货船",
+ "mbDerelictFreightersNote": "单独允许在此星系生成随机废弃货船。还必须启用全局废弃货船游戏选项。"
 }
