@@ -3618,5 +3618,10 @@
  "mpScriptsNotAllowed": "Cette partie utilise des mods à scripts que tu n'as pas autorisés : {0}. Active-les une fois dans Mods pour autoriser leurs scripts, puis rejoins à nouveau.",
  "mpScriptsShort": "autorise d'abord ses scripts : {0}",
  "mpModsCountScripts": "Mods ({0} activés, avec scripts)",
- "scriptNoCommand": "Aucune commande « {0} »."
+ "scriptNoCommand": "Aucune commande « {0} ».",
+ "mbPopulation": "Population ambiante de PNJ",
+ "mbPopulationScale": "Multiplicateur de trafic (0 = aucun, 1 = normal, 2 = double)",
+ "mbPopulationNote": "Ajuste le trafic ambiant aléatoire et les rencontres spéciales aléatoires. Les missions et les rencontres explicitement scénarisées ne sont pas affectées.",
+ "mbDerelictFreighters": "Épaves de cargos aléatoires",
+ "mbDerelictFreightersNote": "Autorise séparément les épaves de cargos aléatoires dans ce système. L’option générale des épaves de cargos doit également être activée."
 }

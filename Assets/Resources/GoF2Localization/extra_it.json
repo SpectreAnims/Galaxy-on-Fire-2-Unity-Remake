@@ -3618,5 +3618,10 @@
  "mpScriptsNotAllowed": "Questa partita usa mod con script che non hai consentito: {0}. Attivale una volta in Mod per consentirne gli script, poi unisciti di nuovo.",
  "mpScriptsShort": "consenti prima i suoi script: {0}",
  "mpModsCountScripts": "Mod ({0} attive, con script)",
- "scriptNoCommand": "Nessun comando \"{0}\"."
+ "scriptNoCommand": "Nessun comando \"{0}\".",
+ "mbPopulation": "Popolazione NPC ambientale",
+ "mbPopulationScale": "Moltiplicatore del traffico (0 = nessuno, 1 = normale, 2 = doppio)",
+ "mbPopulationNote": "Scala il traffico ambientale casuale e gli incontri speciali casuali. Missioni e incontri esplicitamente scriptati non vengono influenzati.",
+ "mbDerelictFreighters": "Relitti di cargo casuali",
+ "mbDerelictFreightersNote": "Consente separatamente la comparsa di relitti di cargo casuali in questo sistema. Deve essere attiva anche l’opzione globale Relitti di cargo."
 }
