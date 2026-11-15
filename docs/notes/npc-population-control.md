@@ -8,7 +8,7 @@ Both fields work on new systems and system overrides and are exposed in the Mod 
 
 ## Spawn boundaries
 
-Population scaling applies to local patrols, jumpers, freighters, raider groups, pirate-base escorts, the special pirate-orbit groups, random big battles, random capital-ship specials and fleet battles, random derelict escorts, and mod NPC types whose spawn rules place them as ambient traffic. It does not scale the derelict freighter itself or a mod blueprint derelict: those use the independent per-system `derelictFreighters` switch (and vanilla random wrecks also require the global Derelict Freighters gameplay option).
+Population scaling applies to local patrols, jumpers, freighters, raider groups, pirate-base escorts, the special pirate-orbit groups, random big battles, random capital-ship specials and fleet battles, random derelict escorts, and mod NPC types whose spawn rules place them as ambient traffic. Random derelict freighters and mod blueprint derelicts are also gated by the per-system `derelictFreighters` switch. The general population multiplier still scales the ambient spawn plan and zero suppresses random derelicts; the separate toggle lets a mod disable derelicts without disabling other ambient traffic. Vanilla random wrecks also require the global Derelict Freighters gameplay option.
 
 It does not remove mission/story ships, event-graph spawns, explicit scripted mod spawns, reported pirate sightings, siege/rift encounters or other content whose spawn is explicitly requested by gameplay logic. The separate unreported random pirate-event roll is also suppressed at population zero. This is implemented at traffic-plan generation points, not by a global NPC cap or despawn sweep.
 
@@ -21,7 +21,7 @@ The existing orbit authority builds the traffic plan. Its resulting NPCs are rep
 - Check parsing and validation of both fields on new systems and overrides.
 - Check Mod Builder JSON round-trip and default omission.
 - Exercise population values 0, fractional, 1, 2 and 4; verify zero suppresses ambient random specials and fractional values do not invoke the unscaled four-ship fallback.
-- Verify `derelictFreighters: false` blocks random wrecks without changing other ambient traffic, and the global option still gates vanilla random wrecks.
+- Verify `derelictFreighters: false` blocks random wrecks without changing other ambient traffic; population zero suppresses random derelicts; the global option still gates vanilla random wrecks.
 - Verify mission/story/event/scripted spawns remain present at population zero.
 - Verify multiplayer clients receive the authority's population and derelict decisions through existing proxy replication.
 - Run the Unity EditMode suite and compile the project; record those checks separately from source inspection.
