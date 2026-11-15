@@ -328,8 +328,8 @@ namespace GoF2Remake.Flight
             // The capital-ship specials (npc_combat_specials.md 2.1): the first freighter becomes the battleship / carrier
             // (Terran) or the Vossk battleship.
             // Remake mods: a mod's "spawn.chance" for the battleship / carrier / Vossk battleship (ModNpcShips) in place of 30.
-            bool terran = sysRace == 0 && freighters > 0 && Random.Range(0, 100) < Modding.ModNpcShips.Chance(Modding.ModNpcShips.Battleship, 30);
-            bool vossk = sysRace == 1 && freighters > 0 && Random.Range(0, 100) < Modding.ModNpcShips.Chance(Modding.ModNpcShips.VosskBattleship, 30) && cm > 0x8c;
+            bool terran = population > 0f && sysRace == 0 && freighters > 0 && Random.Range(0, 100) < Modding.ModNpcShips.Chance(Modding.ModNpcShips.Battleship, 30);
+            bool vossk = population > 0f && sysRace == 1 && freighters > 0 && Random.Range(0, 100) < Modding.ModNpcShips.Chance(Modding.ModNpcShips.VosskBattleship, 30) && cm > 0x8c;
             bool carrier = terran && Random.Range(0, 100) < Modding.ModNpcShips.Chance(Modding.ModNpcShips.Carrier, 30) && cm > 0x67;
             // The supernova system (27) before campaign 0x9e (Status::inSupernovaSystem): nothing but the story's.
             if (story && system.index == 27 && cm < 0x9e) { local = jumpers = freighters = raiders = 0; raidersOn = terran = vossk = false; }
@@ -347,7 +347,7 @@ namespace GoF2Remake.Flight
                     modCapital = Modding.ModCapitalShips.PickCapital(sysRace, true);
                     if (modCapital >= 0) terran = vossk = carrier = false;
                 }
-                else if ((sysRace == 2 || sysRace == 3 || Modding.ModRaces.Is(sysRace)) && freighters > 0
+                else if (population > 0f && (sysRace == 2 || sysRace == 3 || Modding.ModRaces.Is(sysRace)) && freighters > 0
                          && Modding.ModCapitalShips.Has(sysRace, Modding.ModCapitalShips.Battleship) && Random.Range(0, 100) < 30)
                     modCapital = Modding.ModCapitalShips.PickCapital(sysRace, false);
             }
