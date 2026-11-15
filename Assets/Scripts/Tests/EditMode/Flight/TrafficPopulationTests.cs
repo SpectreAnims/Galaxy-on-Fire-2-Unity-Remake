@@ -27,6 +27,25 @@ namespace GoF2Remake.Tests
         public void ScaleAmbientCount_OnePreservesTheOriginalCount()
         {
             Assert.AreEqual(7, TrafficPlan.ScaleAmbientCount(7, 1f));
+        } 
+        [Test]
+        public void ScaleAmbientCount_NeverAddsShipsBelowNormalPopulation()
+        {
+            for (int populationStep = 0; populationStep <= 10; populationStep++)
+            {
+                float population = populationStep / 10f;
+                for (int i = 0; i < 100; i++)
+                    Assert.That(TrafficPlan.ScaleAmbientCount(7, population), Is.InRange(0, 7),
+                        "population " + population);
+            }
         }
+
+        [Test]
+        public void ScaleAmbientCount_ZeroAlwaysRemainsZero()
+        {
+            for (int i = 0; i < 100; i++)
+                Assert.AreEqual(0, TrafficPlan.ScaleAmbientCount(4, 0f));
+        }
+
     }
 }
