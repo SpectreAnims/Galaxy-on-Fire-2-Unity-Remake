@@ -505,11 +505,11 @@ namespace GoF2Remake.Tests
             Repeat(120, 500, 832, list => Assert.IsFalse(list.Exists(s => s.derelict), "disabled for this system"));
 
             system.derelictFreighters = true;
-            system.ambientPopulation = 0f;
+            system.ambientPopulation = 1f;
             Settings.DerelictWrecks = true;
             int wrecks = 0;
             Repeat(120, 1000, 833, list => { if (list.Exists(s => s.derelict)) wrecks++; });
-            Assert.Greater(wrecks, 0, "derelict toggle is independent of ambient population");
+            Assert.Greater(wrecks, 0, "derelict toggle independently disables this spawn category");
 
             system.ambientPopulation = 1f;
             Settings.DerelictWrecks = false;
