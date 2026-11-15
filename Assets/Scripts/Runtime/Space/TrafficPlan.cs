@@ -466,7 +466,7 @@ namespace GoF2Remake.Flight
             // wreck like the hidden blueprints' (its race's: the Vossk freighter 13, else 15, docking point sets 11-14),
             // somewhere out in front of the station, or in the orbits / at the spot its "stations" / "position" name; the hack
             // leaves the blueprint in a data crate (Traffic.OnHackWon).
-            var derelict = system.derelictFreighters ? Modding.ModBlueprints.RollDerelict(station) : null;
+            var derelict = population > 0f && system.derelictFreighters ? Modding.ModBlueprints.RollDerelict(station) : null;
             if (derelict != null)
             {
                 var at = derelict.derelictPosition ?? new Vector3(Random.Range(-80000f, 80000f), Random.Range(-40000f, 40000f), Random.Range(60000f, 140000f));
@@ -479,7 +479,7 @@ namespace GoF2Remake.Flight
             // Dangerous system 2-4 pirates wait at it. One wreck an orbit, not in the special or the storylines' orbits, a
             // pirate base's system, Mido or a freelance mission's orbit. A session rule: the orbit's runner rolls it, the
             // other players hack a stand-in of its copy (NetOrbit.UpdateDerelictStandIns).
-            if (system.derelictFreighters && Settings.DerelictWrecks && !quietOrbit && !baseSystem && system.index != 15 && (fm == null || fm.target != station)
+            if (population > 0f && system.derelictFreighters && Settings.DerelictWrecks && !quietOrbit && !baseSystem && system.index != 15 && (fm == null || fm.target != station)
                 && !PirateEventRules.InStoryline(station) && !list.Exists(s => s.deadButSelectable) && Random.Range(0, 100) < DerelictChance(secEff))
             {
                 var at = new Vector3(Random.Range(-80000f, 80000f), Random.Range(-40000f, 40000f), Random.Range(60000f, 140000f));
