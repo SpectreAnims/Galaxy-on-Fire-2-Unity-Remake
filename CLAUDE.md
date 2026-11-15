@@ -47,6 +47,7 @@ This file holds only what every task needs. Everything about one area of the gam
 | [chat-and-commands.md](docs/notes/chat-and-commands.md) | Chat, chat commands, admin tools, selectors |
 | [event-graphs.md](docs/notes/event-graphs.md) | Events, event graph files and nodes, quests, bar missions, cutscenes, ship orders, wormholes |
 | [mods.md](docs/notes/mods.md) | Mod format, items, ships, numbers, saves, campaigns, options, flight styles, conditions, traffic, capital ships, NPC ships, mobile stations, ES2 docking, blueprints, scripts (Lua), browser, multiplayer |
+| [npc-population-control.md](docs/notes/npc-population-control.md) | Per-system ambient NPC population and derelict freighter controls, spawn boundaries and multiplayer authority |
 | [mods-models.md](docs/notes/mods-models.md) | Ship models, how a ship is seen, engine effects, exhaust styles, textures / skins, image formats, loading |
 | [mods-ship-kits.md](docs/notes/mods-ship-kits.md) | Ship kits, builds, colours, skins, hardpoint models, engine flames, lateral thrusters, liveries, decals, engine trails |
 | [mods-world.md](docs/notes/mods-world.md) | Systems, stations, station models, planets, suns, skies, interiors, characters, mod races |

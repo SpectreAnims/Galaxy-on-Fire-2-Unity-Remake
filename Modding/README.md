@@ -1803,6 +1803,8 @@ This setting does not remove or scale mission ships, story encounters, explicitl
 | `pirateHeld` | `true`: pirates hold every station of the system (a station's `orbit` can say otherwise), see the orbit's `pirateHeld`. |
 | `pirateHideout` | `true`: a pirate hideout like Alda. On every visit 10 to 13 pirates with double hulls wait around the arriving ship (the system's `raiders` instead, if it names any), and nothing else flies there: no patrols, freighters, pirate events or fleet battles. For a hideout without stations give its stations `"orbit": { "station": false }`. |
 | `security` | 0 (lawless) to 3 (secure): how many raiders show up. |
+| `population` | Optional multiplier (0–4) for random ambient NPC traffic and random ambient special encounters. 1 (default) preserves vanilla counts; 0 suppresses random ambient spawns. Mission/story and explicitly scripted spawns are not affected. |
+| `derelictFreighters` | Optional boolean (default true): independently enables or disables random derelict freighters, including mod blueprint derelict rolls, in this system. Population 0 suppresses random ambient wrecks; the global Derelict Freighters option remains a master switch for vanilla random wrecks. |
 | `visible` | On the star map from the start (default true). A hidden system can't be reached yet. |
 | `available` | A condition (the expressions of [Conditions](#conditions)) for a system that comes and goes: while it holds the system is on the star map, while it doesn't it is hidden, whatever was revealed, with its routes and jumps. A player inside when it disappears is told so and, 4 seconds later, taken to the nearest system on the map. For example `"available": "quest(smuggler_run) == 1"`: only while that story mission or bar mission is under way. |
 | `position` | `[x, y, z]` on the star map. The original systems lie between 15 and 94 (x), 2 and 96 (y) and 10 and 90 (z). |
@@ -1815,7 +1817,7 @@ This setting does not remove or scale mission ships, story encounters, explicitl
 | `jumpgate` | Its own jumpgate model in its gate orbit: `{ "model": "models/gate.glb", "size": 15000, "yaw": 0, "radius": 7500, "materials": [...] }`. `model` a glTF / GLB in the mod (like a station's) or a game model (`"gof2:jumpgate_vossk_anim"`); `size` its largest extent in game units (default 15000; the game's gates are about 15000, the Vossk one 22500); `yaw` degrees about its up axis (ships fly through it along its front, the model's +Z); `radius` how near a ship must come to jump, and its collision sphere (default half its size); `materials` like [ships.json's](#materials). Default: its race's gate. A gate of your own has no jump flash (the game's gates play one as a ship goes through). |
 | `spaceMusic`, `stationMusic`, `battleMusic` | A mod's track (see [Music](#music)); `battleMusic` one or three. |
 
-Changing a system (`"override"`): `name`, `security`, `visible`, `available`, `sky`, `sunTexture`, `sunColor`, `skybox`, `jumpgate`, the music, and `gates` (added to its routes; links original systems too).
+Changing a system (`"override"`): `name`, `security`, `population`, `derelictFreighters`, `visible`, `available`, `sky`, `sunTexture`, `sunColor`, `skybox`, `jumpgate`, the music, and `gates` (added to its routes; links original systems too).
 
 Events and missions can also show or hide a system themselves: the `system` step (Show / hide a system), the graph's **Show /
 Hide System** node, or the command `system [players] <system> <show | hide | reset>` (the system by number, name or
