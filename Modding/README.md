@@ -1788,9 +1788,11 @@ New star systems and their stations. Both are lists: `"id"` adds one, `"override
 
 #### Ambient NPC population
 
-A system may set `"population"` in `systems.json` to scale its ordinary ambient NPC traffic. The value is a multiplier from `0` to `4`: `0` disables ambient local patrols, jumpers, freighters and random raider groups; `1` (the default) leaves the game’s population unchanged; `2` doubles those baseline counts. The Mod Builder exposes the same setting on each system. Omitting the field preserves existing behaviour.
+A system may set `"population"` to a multiplier from `0` to `4`. The default `1` preserves vanilla ambient counts; `0` suppresses randomly generated ambient traffic and ambient special groups, including the special pirate-orbit groups, random big battles, capital-ship specials and fleet battles. Fractional values use stochastic rounding. The Mod Builder exposes this setting on each system.
 
-This setting does not remove or scale mission ships, story encounters, explicitly scripted spawns, pirate events, siege / rift encounters or other special encounters. The multiplayer orbit authority builds the population once and the existing NPC proxy synchronisation shares it with other players.
+Mission and story ships, explicitly scripted mod spawns, reported or active pirate events, siege and rift encounters, and other gameplay-requested spawns remain unaffected. Ambient mod NPC ship types are scaled with the ambient category they replace. The multiplayer orbit authority builds the population once and existing NPC proxy synchronisation shares it with other players.
+
+`"derelictFreighters"` (default `true`) independently enables or disables random derelict freighters in the system, including mod blueprint derelict rolls. The global Derelict Freighters gameplay option remains a master switch for the vanilla random wreck. Population `0` suppresses all random ambient wrecks.
 
 
 | Field | |

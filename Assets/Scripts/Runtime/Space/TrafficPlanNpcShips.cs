@@ -276,9 +276,11 @@ namespace GoF2Remake.Flight
                 if (s == null || s.chance <= 0f || !NpcSpawnHolds(t, station, system, sysRace)) continue;
                 if (s.replaceGame && !gameCapital) continue;
                 if (Random.Range(0f, 100f) >= s.chance) continue;
+                int count = TrafficPlan.ScaleAmbientCount(Random.Range(s.min, s.max + 1), population);
+                if (count <= 0) continue;
                 if (s.replaceGame) replaced = true;
                 int race = t.race >= 0 ? t.race : sysRace;
-                for (int n = TrafficPlan.ScaleAmbientCount(Random.Range(s.min, s.max + 1), population), i = 0; i < n; i++)
+                for (int i = 0; i < count; i++)
                     AddNpcType(db, list, t, race, NpcSpawnPoint(t, station, race));
             }
             return replaced;

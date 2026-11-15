@@ -266,6 +266,7 @@ namespace GoF2Remake.Flight
             bool baseSystem = PirateBases.SystemHasBase(db, system.index);
             int baseEscorts = 0;
             if (baseSystem) { raidersOn = false; raiders = 0; escorts = 0; baseEscorts = hardcore ? Random.Range(0, 3) + 4 : 2; }
+            baseEscorts = ScaleAmbientCount(baseEscorts, population);
             // Coming out of the Void, or at the station the Void attack (not at 42): 2-5 Void raiders from the wormhole and at
             // least 2 freighters for them to hunt (Level::createMission, npc_traffic_ai.md 2.2).
             bool voidRaid = story && cm != 42 && cm < 45 && (Session.ComingFromVoid || station == Session.VoidInvasionStation);
@@ -291,7 +292,7 @@ namespace GoF2Remake.Flight
                 if (population > 0f && jumpers + local + freighters + raiders + escorts + baseEscorts == 0) local = ScaleAmbientCount(4, population);
             }
             // The special orbits: 102-104 only 3-7 pirates (escorts stay); 100 / 101 / 108 and Thynome (10) empty.
-            if (station >= 102 && station <= 104) { local = jumpers = freighters = 0; raiders = Random.Range(0, 5) + 3; raidersOn = true; raiderRace = Standing.Pirate; }
+            if (station >= 102 && station <= 104) { local = jumpers = freighters = 0; raiders = population > 0f ? ScaleAmbientCount(Random.Range(0, 5) + 3, population) : 0; raidersOn = raiders > 0; raiderRace = Standing.Pirate; }
             else if (station == 100 || station == 101 || station == 108 || station == 10) { local = jumpers = freighters = raiders = 0; raidersOn = false; }
             // Campaign 0x24 / 0x25 in S'kolptorr: no local fighters, no raiders; 0x2a / 0x2b: no raiders, no pirate escorts.
             if (story && (cm == 0x24 || cm == 0x25) && system.index == 5) local = raiders = 0;
@@ -303,9 +304,10 @@ namespace GoF2Remake.Flight
             if (system.index == 25 || lootOrbit)
             {
                 escorts = baseEscorts = local = jumpers = freighters = 0;
-                raiders = Random.Range(0, 4) + (lootOrbit ? 10 : 6);
-                if (hardcore) raiders = Random.Range(0, 3) + raiders * 2;
-                raidersOn = true;
+                raiders = population > 0f ? Random.Range(0, 4) + (lootOrbit ? 10 : 6) : 0;
+                if (hardcore && raiders > 0) raiders = Random.Range(0, 3) + raiders * 2;
+                raiders = ScaleAmbientCount(raiders, population);
+                raidersOn = raiders > 0;
                 if (raiderRaces == null) raiderRace = Standing.Pirate;
             }
             // Late-campaign Specter raids (100 < campaign < 0x91): (campaign / 144 * 15 + 5) % (x2 Extreme), 2-4 (x2).
@@ -476,7 +478,7 @@ namespace GoF2Remake.Flight
                 var wreck = HackableWreck(-1, at);
                 wreck.derelict = true;
                 list.Add(wreck);
-                if (secEff <= 1) AddRaiders(list, Random.Range(2, 5), pirateRace, at);
+                if (secEff <= 1) AddRaiders(list, ScaleAmbientCount(Random.Range(2, 5), population), pirateRace, at);
             }
             // 7 Specters, always enemy: one point near the player, each at it + createShip's +-20000 jitter.
             if (specters > 0)
