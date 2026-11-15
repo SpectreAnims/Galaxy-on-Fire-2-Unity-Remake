@@ -21,7 +21,7 @@ The existing orbit authority builds the traffic plan. Its resulting NPCs are rep
 - Check parsing and validation of both fields on new systems and overrides.
 - Check Mod Builder JSON round-trip and default omission.
 - Exercise population values 0, fractional, 1, 2 and 4; verify zero suppresses ambient random specials and fractional values do not invoke the unscaled four-ship fallback.
-- Verify `derelictFreighters: false` blocks random wrecks without changing other ambient traffic; population zero suppresses random derelicts; the global option still gates vanilla random wrecks.
+- Verify `derelictFreighters: false` blocks random wrecks without changing other ambient traffic; population zero still permits derelicts when the per-system toggle is true; the global option still gates vanilla random wrecks.
 - Verify mission/story/event/scripted spawns remain present at population zero.
 - Verify multiplayer clients receive the authority's population and derelict decisions through existing proxy replication.
 - Run the Unity EditMode suite and compile the project; record those checks separately from source inspection.
