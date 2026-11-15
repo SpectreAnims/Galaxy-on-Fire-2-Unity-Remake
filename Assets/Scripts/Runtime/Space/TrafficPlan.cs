@@ -320,10 +320,11 @@ namespace GoF2Remake.Flight
             }
             // Late-campaign Specter raids (100 < campaign < 0x91): (campaign / 144 * 15 + 5) % (x2 Extreme), 2-4 (x2).
             int specters = 0;
-            if (story && cm > 100 && cm < 0x91)
+            if (population > 0f && story && cm > 100 && cm < 0x91)
             {
                 int p = (int)(cm / 144f * 15f + 5f) << (hardcore ? 1 : 0);
                 if (Random.Range(0, 100) < p) specters = (Random.Range(0, 3) + 2) << (hardcore ? 1 : 0);
+                specters = ScaleAmbientCount(specters, population);
             }
             // The capital-ship specials (npc_combat_specials.md 2.1): the first freighter becomes the battleship / carrier
             // (Terran) or the Vossk battleship.
@@ -466,7 +467,8 @@ namespace GoF2Remake.Flight
             // wreck like the hidden blueprints' (its race's: the Vossk freighter 13, else 15, docking point sets 11-14),
             // somewhere out in front of the station, or in the orbits / at the spot its "stations" / "position" name; the hack
             // leaves the blueprint in a data crate (Traffic.OnHackWon).
-            var derelict = population > 0f && system.derelictFreighters ? Modding.ModBlueprints.RollDerelict(station) : null;
+            // Derelicts have their own per-system switch; the ambient population multiplier does not control wrecks.
+            var derelict = system.derelictFreighters ? Modding.ModBlueprints.RollDerelict(station) : null;
             if (derelict != null)
             {
                 var at = derelict.derelictPosition ?? new Vector3(Random.Range(-80000f, 80000f), Random.Range(-40000f, 40000f), Random.Range(60000f, 140000f));
@@ -476,10 +478,11 @@ namespace GoF2Remake.Flight
             }
             // Remake (players' wish, Discord 2026-10-18; Options > Gameplay "Derelict freighters"): now and then a derelict
             // freighter of any race out in front of the station, hacked once for its cargo (Traffic.OnHackWon); in a Risky or
-            // Dangerous system 2-4 pirates wait at it. One wreck an orbit, not in the special or the storylines' orbits, a
+            // Dangerous system 2-4 pirates wait at it. The per-system derelict toggle is independent of ambient population;
+            // only its accompanying ambient pirate escorts scale with population. One wreck an orbit, not in the special or the storylines' orbits, a
             // pirate base's system, Mido or a freelance mission's orbit. A session rule: the orbit's runner rolls it, the
             // other players hack a stand-in of its copy (NetOrbit.UpdateDerelictStandIns).
-            if (population > 0f && system.derelictFreighters && Settings.DerelictWrecks && !quietOrbit && !baseSystem && system.index != 15 && (fm == null || fm.target != station)
+            if (system.derelictFreighters && Settings.DerelictWrecks && !quietOrbit && !baseSystem && system.index != 15 && (fm == null || fm.target != station)
                 && !PirateEventRules.InStoryline(station) && !list.Exists(s => s.deadButSelectable) && Random.Range(0, 100) < DerelictChance(secEff))
             {
                 var at = new Vector3(Random.Range(-80000f, 80000f), Random.Range(-40000f, 40000f), Random.Range(60000f, 140000f));
