@@ -3618,5 +3618,10 @@
  "mpScriptsNotAllowed": "Ta gra używa modów ze skryptami, na które nie masz zgody: {0}. Włącz je raz w Modach, aby zezwolić na ich skrypty, i dołącz ponownie.",
  "mpScriptsShort": "najpierw zezwól na skrypty: {0}",
  "mpModsCountScripts": "Mody (włączone: {0}, ze skryptami)",
- "scriptNoCommand": "Nie ma polecenia \"{0}\"."
+ "scriptNoCommand": "Nie ma polecenia \"{0}\".",
+ "mbPopulation": "Ambientowa populacja NPC",
+ "mbPopulationScale": "Mnożnik ruchu (0 = brak, 1 = normalnie, 2 = podwójnie)",
+ "mbPopulationNote": "Skaluje losowy ruch w przestrzeni i losowe specjalne spotkania. Misje i spotkania jawnie zaprogramowane nie są zmieniane.",
+ "mbDerelictFreighters": "Losowe wraki frachtowców",
+ "mbDerelictFreightersNote": "Niezależnie zezwala na losowe wraki frachtowców w tym systemie. Globalna opcja rozgrywki dotycząca wraków frachtowców również musi być włączona."
 }

@@ -3618,5 +3618,10 @@
  "mpScriptsNotAllowed": "Este jogo usa mods com scripts que você não permitiu: {0}. Ative-os uma vez em Mods para permitir os scripts e entre de novo.",
  "mpScriptsShort": "permita os scripts primeiro: {0}",
  "mpModsCountScripts": "Mods ({0} ativados, com scripts)",
- "scriptNoCommand": "Não há comando \"{0}\"."
+ "scriptNoCommand": "Não há comando \"{0}\".",
+ "mbPopulation": "População ambiente de NPCs",
+ "mbPopulationScale": "Multiplicador de tráfego (0 = nenhum, 1 = normal, 2 = dobro)",
+ "mbPopulationNote": "Ajusta o tráfego ambiente aleatório e os encontros especiais aleatórios. Missões e encontros explicitamente programados não são afetados.",
+ "mbDerelictFreighters": "Cargueiros abandonados aleatórios",
+ "mbDerelictFreightersNote": "Permite separadamente cargueiros abandonados aleatórios neste sistema. A opção global de cargueiros abandonados também tem de estar ativada."
 }
