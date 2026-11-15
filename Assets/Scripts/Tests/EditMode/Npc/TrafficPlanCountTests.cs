@@ -220,6 +220,18 @@ namespace GoF2Remake.Tests
         }
 
         [Test]
+        public void ZeroPopulationSuppressesRandomLateCampaignSpecterRaids()
+        {
+            InStory(120, 0);
+            var system = SystemOf(20);
+            system.ambientPopulation = 0f;
+            system.derelictFreighters = false;
+            int specters = 0;
+            Repeat(20, 500, 1904, list => specters += list.Count(s => s.race == Standing.Specter));
+            Assert.AreEqual(0, specters);
+        }
+
+        [Test]
         public void DerelictFreightersRemainIndependentOfAmbientPopulation()
         {
             InFreePlay(0);
