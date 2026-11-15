@@ -3618,5 +3618,10 @@
  "mpScriptsNotAllowed": "이 게임은 허용하지 않은 스크립트 모드를 사용합니다: {0}. 모드 화면에서 한 번 켜서 스크립트를 허용한 뒤 다시 참가하십시오.",
  "mpScriptsShort": "먼저 스크립트를 허용하십시오: {0}",
  "mpModsCountScripts": "모드 ({0}개 활성, 스크립트 포함)",
- "scriptNoCommand": "\"{0}\" 명령이 없습니다."
+ "scriptNoCommand": "\"{0}\" 명령이 없습니다.",
+ "mbPopulation": "주변 NPC 인구",
+ "mbPopulationScale": "교통량 배율 (0 = 없음, 1 = 보통, 2 = 두 배)",
+ "mbPopulationNote": "무작위 주변 교통과 무작위 특수 조우를 조정합니다. 임무 및 명시적으로 스크립트된 조우에는 영향을 주지 않습니다.",
+ "mbDerelictFreighters": "무작위 표류 화물선",
+ "mbDerelictFreightersNote": "이 시스템에서 무작위 표류 화물선의 출현을 별도로 허용합니다. 전역 표류 화물선 게임플레이 옵션도 켜져 있어야 합니다."
 }

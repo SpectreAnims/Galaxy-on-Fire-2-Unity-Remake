@@ -3618,5 +3618,10 @@
  "mpScriptsNotAllowed": "Dit spel gebruikt scriptmods die je niet hebt toegestaan: {0}. Zet ze één keer aan onder Mods om hun scripts toe te staan en doe dan opnieuw mee.",
  "mpScriptsShort": "sta eerst de scripts toe: {0}",
  "mpModsCountScripts": "Mods ({0} aan, met scripts)",
- "scriptNoCommand": "Geen opdracht \"{0}\"."
+ "scriptNoCommand": "Geen opdracht \"{0}\".",
+ "mbPopulation": "Omgevings-NPC-populatie",
+ "mbPopulationScale": "Verkeersfactor (0 = geen, 1 = normaal, 2 = dubbel)",
+ "mbPopulationNote": "Schaalt willekeurig omgevingsverkeer en willekeurige speciale ontmoetingen. Missies en expliciet gescripte ontmoetingen blijven onaangetast.",
+ "mbDerelictFreighters": "Willekeurige wrakvrachtschepen",
+ "mbDerelictFreightersNote": "Staat willekeurige wrakvrachtschepen in dit systeem afzonderlijk toe. De algemene gameplayoptie voor wrakvrachtschepen moet ook aanstaan."
 }
