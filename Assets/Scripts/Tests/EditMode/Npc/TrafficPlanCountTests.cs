@@ -206,6 +206,20 @@ namespace GoF2Remake.Tests
         }
 
         [Test]
+        public void LowPopulationDoesNotRestoreTheFourPatrolFallback()
+        {
+            InFreePlay(0);
+            var system = SystemOf(78);
+            system.ambientPopulation = 0.01f;
+            system.derelictFreighters = false;
+            Repeat(78, 500, 1900, list =>
+            {
+                Assert.LessOrEqual(Count(list, NpcGroup.Local), 1,
+                    "a scaled-down non-empty plan must not become the four-patrol fallback");
+            });
+        }
+
+        [Test]
         public void ZeroPopulationDoesNotRestoreTheEmptyOrbitPatrolFallback()
         {
             InFreePlay(0);
