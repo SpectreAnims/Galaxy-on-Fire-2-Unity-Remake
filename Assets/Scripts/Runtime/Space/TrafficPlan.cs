@@ -251,8 +251,15 @@ namespace GoF2Remake.Flight
             // Modder-controlled ambient traffic only. Apply before scripted encounter rules below so their
             // minimums and explicit spawns (missions, pirate events, Void raids, sieges, rifts, etc.) remain untouched.
             float population = Mathf.Clamp(system.ambientPopulation, 0f, 4f);
+            // Remember whether vanilla's random ambient plan had anything before scaling. If all positive counts
+            // stochastic-round down to zero, that must stay an empty orbit rather than invoking the vanilla
+            // empty-orbit patrol fallback and adding ships back.
+            int unscaledAmbientCount = jumpers + local + freighters + raiders;
+            // An attacked station's extra patrols are ambient too: apply the vanilla minimum before population scaling.
+            if (Session.AttackedStations.Contains(station)) local = Mathf.Max(local, 7);
             // The "big battle" is random ambient traffic too, so population zero suppresses its roll.
             if (population > 0f && raidersOn && cm > 0x1f && Random.Range(0, 100) < 8) raiders = local = 9;
+            unscaledAmbientCount = jumpers + local + freighters + raiders;
             raiders = ScaleAmbientCount(raiders, population);
             jumpers = ScaleAmbientCount(jumpers, population);
             local = ScaleAmbientCount(local, population);
@@ -288,8 +295,10 @@ namespace GoF2Remake.Flight
             if (informer) { local = Session.InformerKilled ? 6 : 7; jumpers = freighters = raiders = escorts = baseEscorts = 0; raidersOn = false; }
             else
             {
-                if (Session.AttackedStations.Contains(station)) local = Mathf.Max(local, 7);
-                if (population > 0f && jumpers + local + freighters + raiders + escorts + baseEscorts == 0) local = ScaleAmbientCount(4, population);
+                // Only use the four-patrol fallback when the unscaled ambient plan was genuinely empty.
+                // A non-empty plan that rounded down at a low multiplier must remain empty.
+                if (population > 0f && unscaledAmbientCount == 0 && jumpers + local + freighters + raiders + escorts + baseEscorts == 0)
+                    local = ScaleAmbientCount(4, population);
             }
             // The special orbits: 102-104 only 3-7 pirates (escorts stay); 100 / 101 / 108 and Thynome (10) empty.
             if (station >= 102 && station <= 104) { local = jumpers = freighters = 0; raiders = population > 0f ? ScaleAmbientCount(Random.Range(0, 5) + 3, population) : 0; raidersOn = raiders > 0; raiderRace = Standing.Pirate; }
