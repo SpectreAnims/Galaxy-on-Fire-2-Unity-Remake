@@ -3618,5 +3618,10 @@
  "mpScriptsNotAllowed": "Esta partida usa mods con scripts que no has permitido: {0}. Actívalos una vez en Mods para permitir sus scripts y vuelve a unirte.",
  "mpScriptsShort": "permite antes sus scripts: {0}",
  "mpModsCountScripts": "Mods ({0} activados, con scripts)",
- "scriptNoCommand": "No existe el comando \"{0}\"."
+ "scriptNoCommand": "No existe el comando \"{0}\".",
+ "mbPopulation": "Población ambiental de NPC",
+ "mbPopulationScale": "Multiplicador de tráfico (0 = ninguno, 1 = normal, 2 = doble)",
+ "mbPopulationNote": "Escala el tráfico ambiental aleatorio y los encuentros especiales aleatorios. Las misiones y los encuentros programados explícitamente no se ven afectados.",
+ "mbDerelictFreighters": "Cargueros abandonados aleatorios",
+ "mbDerelictFreightersNote": "Permite por separado la aparición de cargueros abandonados aleatorios en este sistema. La opción global de cargueros abandonados también debe estar activada."
 }

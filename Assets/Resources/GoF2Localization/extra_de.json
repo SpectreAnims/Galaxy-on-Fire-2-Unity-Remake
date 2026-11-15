@@ -3618,5 +3618,10 @@
  "mpScriptsNotAllowed": "Dieses Spiel nutzt Skript-Mods, die du nicht erlaubt hast: {0}. Schalte sie einmal unter Mods ein, um ihre Skripte zu erlauben, und tritt dann erneut bei.",
  "mpScriptsShort": "erst die Skripte erlauben: {0}",
  "mpModsCountScripts": "Mods ({0} aktiv, mit Skripten)",
- "scriptNoCommand": "Kein Befehl \"{0}\"."
+ "scriptNoCommand": "Kein Befehl \"{0}\".",
+ "mbPopulation": "Ambiente NPC-Bevölkerung",
+ "mbPopulationScale": "Verkehrsmultiplikator (0 = keine, 1 = normal, 2 = doppelt)",
+ "mbPopulationNote": "Skaliert zufälligen Umgebungsschiffsverkehr und zufällige besondere Begegnungen. Missions- und ausdrücklich geskriptete Begegnungen bleiben unverändert.",
+ "mbDerelictFreighters": "Zufällige Wrack-Frachter",
+ "mbDerelictFreightersNote": "Erlaubt unabhängig davon zufällige Wrack-Frachter in diesem System. Die globale Gameplay-Option für Wrack-Frachter muss ebenfalls aktiviert sein."
 }
