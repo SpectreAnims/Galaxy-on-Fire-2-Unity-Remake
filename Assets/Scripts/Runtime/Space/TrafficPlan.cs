@@ -245,7 +245,6 @@ namespace GoF2Remake.Flight
             float population = Mathf.Clamp(system.ambientPopulation, 0f, 4f);
             raiders = ScaleAmbientCount(raiders, population);
             jumpers = ScaleAmbientCount(jumpers, population);
-            freighters = ScaleAmbientCount(freighters, population);
             local = ScaleAmbientCount(local, population);
             // The "big battle" (npc_traffic_ai.md 2.2): raiders on, campaign > 0x1f, 8 %: 9 raiders against 9 locals.
             if (raidersOn && cm > 0x1f && Random.Range(0, 100) < 8) raiders = local = 9;
@@ -333,7 +332,10 @@ namespace GoF2Remake.Flight
                          && Modding.ModCapitalShips.Has(sysRace, Modding.ModCapitalShips.Battleship) && Random.Range(0, 100) < 30)
                     modCapital = Modding.ModCapitalShips.PickCapital(sysRace, false);
             }
-            if (terran || vossk || modCapital >= 0) freighters--;
+            // A capital ship is a special encounter replacing a freighter slot, not ambient traffic. Keep its chance
+            // independent of the population setting, then scale only the ordinary freighters that remain.
+            if (!voidRaid) freighters = ScaleAmbientCount(freighters, population);
+            if (terran || vossk || modCapital >= 0) freighters = Mathf.Max(0, freighters - 1);
             // A pirate raid on a traveller (initStreamOutPosition): rnd(100) < rank + 20 (40 Extreme) moves the pirates'
             // point toward the arriving player (Route::setNewCoords(player position / 3), the divisor read in the iOS build's
             // Level::createMission; the remake takes a quarter of the way: half the way put up to 19 Extreme pirates on a player just arrived within
