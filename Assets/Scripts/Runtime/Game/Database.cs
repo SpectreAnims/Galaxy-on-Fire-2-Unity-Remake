@@ -92,7 +92,8 @@ namespace GoF2Remake.Data
         public string name;
         public int securityLevel;
         /// <summary>Modding: systems.json population, the ambient NPC traffic multiplier (0 = none, 1 = unchanged).</summary>
-        public float ambientPopulation = 1f;
+        [System.NonSerialized] public float ambientPopulation = 1f;
+        [System.NonSerialized] public bool derelictFreighters = true;
         public bool initiallyVisible;
         public string race;
         public int raceId;

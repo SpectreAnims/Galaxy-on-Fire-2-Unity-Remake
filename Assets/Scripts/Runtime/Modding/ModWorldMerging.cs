@@ -82,6 +82,7 @@ namespace GoF2Remake.Modding
                         }
                         s.securityLevel = Mathf.Clamp(ModJson.Int(o, "security", s.securityLevel, d.file), 0, 3);
                         if (ModJson.Has(o, "population")) s.ambientPopulation = Mathf.Clamp(ModJson.Float(o, "population", 1f, d.file), 0f, 4f);
+                        if (ModJson.Has(o, "derelictFreighters")) s.derelictFreighters = ModJson.Bool(o, "derelictFreighters", true, d.file);
                         s.initiallyVisible = ModJson.Bool(o, "visible", s.initiallyVisible, d.file);
                         s.textureIndex = Mathf.Clamp(ModJson.Int(o, "sky", s.textureIndex, d.file), 0, 18);
                         foreach (var g in ModJson.Strings(o, "gates"))
