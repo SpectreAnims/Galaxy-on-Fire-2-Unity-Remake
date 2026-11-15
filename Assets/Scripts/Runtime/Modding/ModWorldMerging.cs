@@ -81,6 +81,7 @@ namespace GoF2Remake.Modding
                             if (l.Count > 0) into[s.index] = l;
                         }
                         s.securityLevel = Mathf.Clamp(ModJson.Int(o, "security", s.securityLevel, d.file), 0, 3);
+                        if (ModJson.Has(o, "population")) s.ambientPopulation = Mathf.Clamp(ModJson.Float(o, "population", 1f, d.file), 0f, 4f);
                         s.initiallyVisible = ModJson.Bool(o, "visible", s.initiallyVisible, d.file);
                         s.textureIndex = Mathf.Clamp(ModJson.Int(o, "sky", s.textureIndex, d.file), 0, 18);
                         foreach (var g in ModJson.Strings(o, "gates"))

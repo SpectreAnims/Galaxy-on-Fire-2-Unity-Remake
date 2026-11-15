@@ -1786,6 +1786,13 @@ New star systems and their stations. Both are lists: `"id"` adds one, `"override
 
 ### Systems
 
+#### Ambient NPC population
+
+A system may set `"population"` in `systems.json` to scale its ordinary ambient NPC traffic. The value is a multiplier from `0` to `4`: `0` disables ambient local patrols, jumpers, freighters and random raider groups; `1` (the default) leaves the game’s population unchanged; `2` doubles those baseline counts. The Mod Builder exposes the same setting on each system. Omitting the field preserves existing behaviour.
+
+This setting does not remove or scale mission ships, story encounters, explicitly scripted spawns, pirate events, siege / rift encounters or other special encounters. The multiplayer orbit authority builds the population once and the existing NPC proxy synchronisation shares it with other players.
+
+
 | Field | |
 |---|---|
 | `id`, `name` | As for items. |

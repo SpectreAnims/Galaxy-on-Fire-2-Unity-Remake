@@ -175,6 +175,9 @@ namespace GoF2Remake.Flight
             return fm != null && fm.type == MissionType.Informer && fm.target == station && !Session.InformerFailed;
         }
 
+        /// <summary>Scales only the ambient counts. Explicit/scripted spawns are deliberately added separately.</summary>
+        public static int ScaleAmbientCount(int count, float population) => count <= 0 ? 0 : Mathf.Max(0, Mathf.RoundToInt(count * Mathf.Clamp(population, 0f, 4f)));
+
         public static List<SpawnSpec> Build(Database db, int station, SystemData system, Vector3 playerGame = default, Vector3? wormholeGame = null)
         {
             var list = new List<SpawnSpec>();
@@ -237,6 +240,13 @@ namespace GoF2Remake.Flight
                 x = Random.Range(0, 2);
             }
             int local = (mido ? Random.Range(0, 2) : secEff) + x + freighters / 4;
+            // Modder-controlled ambient traffic only. Apply before scripted encounter rules below so their
+            // minimums and explicit spawns (missions, pirate events, Void raids, sieges, rifts, etc.) remain untouched.
+            float population = Mathf.Clamp(system.ambientPopulation, 0f, 4f);
+            raiders = ScaleAmbientCount(raiders, population);
+            jumpers = ScaleAmbientCount(jumpers, population);
+            freighters = ScaleAmbientCount(freighters, population);
+            local = ScaleAmbientCount(local, population);
             // The "big battle" (npc_traffic_ai.md 2.2): raiders on, campaign > 0x1f, 8 %: 9 raiders against 9 locals.
             if (raidersOn && cm > 0x1f && Random.Range(0, 100) < 8) raiders = local = 9;
             // Freelance cargo attracts pirates: int(d / 10 * 5) escorts for Courier, Passenger and Ore Mining missions (types 0,
@@ -270,7 +280,7 @@ namespace GoF2Remake.Flight
             else
             {
                 if (Session.AttackedStations.Contains(station)) local = Mathf.Max(local, 7);
-                if (jumpers + local + freighters + raiders + escorts + baseEscorts == 0) local = 4;
+                if (population > 0f && jumpers + local + freighters + raiders + escorts + baseEscorts == 0) local = 4;
             }
             // The special orbits: 102-104 only 3-7 pirates (escorts stay); 100 / 101 / 108 and Thynome (10) empty.
             if (station >= 102 && station <= 104) { local = jumpers = freighters = 0; raiders = Random.Range(0, 5) + 3; raidersOn = true; raiderRace = Standing.Pirate; }
