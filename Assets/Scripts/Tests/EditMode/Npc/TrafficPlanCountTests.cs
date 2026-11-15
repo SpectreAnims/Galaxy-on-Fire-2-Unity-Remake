@@ -459,5 +459,60 @@ namespace GoF2Remake.Tests
             InStory(0x2a);
             Repeat(20, 500, 36, list => Assert.AreEqual(0, Count(list, NpcGroup.Raider)));
         }
+        [Test]
+        public void ZeroPopulationSuppressesRandomAmbientTrafficAndSpecialGroups()
+        {
+            InFreePlay(0);
+            var stations = new List<int> { 20, 102, 103, 104, 105, 132, 133 };
+            int pirateBaseStation = Db.Stations.First(s => PirateBases.SystemHasBase(Db, s.system)).index;
+            stations.Add(pirateBaseStation);
+
+            foreach (int station in stations)
+            {
+                SystemOf(station).ambientPopulation = 0f;
+                var list = Build(station);
+                Assert.AreEqual(0, Count(list, NpcGroup.Local), "locals at " + station);
+                Assert.AreEqual(0, Count(list, NpcGroup.Jumper), "jumpers at " + station);
+                Assert.AreEqual(0, Count(list, NpcGroup.Freighter), "freighters at " + station);
+                Assert.AreEqual(0, Count(list, NpcGroup.Raider), "raiders at " + station);
+                Assert.AreEqual(0, Count(list, NpcGroup.Escort), "ambient escorts at " + station);
+            }
+        }
+
+        [Test]
+        public void FractionalPopulationScalesSpecialPirateOrbitGroups()
+        {
+            InFreePlay(0);
+            SystemOf(105).ambientPopulation = 0.5f; // Loma: vanilla mean 7.5 raiders
+            double total = 0;
+            Repeat(105, 2000, 831, list =>
+            {
+                int count = Count(list, NpcGroup.Raider);
+                Assert.That(count, Is.InRange(3, 5));
+                total += count;
+            });
+            Assert.AreEqual(3.75, total / 2000, 0.12);
+        }
+
+        [Test]
+        public void PerSystemDerelictToggleIsIndependentOfAmbientTrafficAndGlobalOption()
+        {
+            InFreePlay(0);
+            var system = SystemOf(120);
+            system.ambientPopulation = 1f;
+            system.derelictFreighters = false;
+            Settings.DerelictWrecks = true;
+            Repeat(120, 500, 832, list => Assert.IsFalse(list.Exists(s => s.derelict), "disabled for this system"));
+
+            system.derelictFreighters = true;
+            Settings.DerelictWrecks = false;
+            Repeat(120, 500, 833, list => Assert.IsFalse(list.Exists(s => s.derelict), "global gameplay option is the master switch"));
+
+            Settings.DerelictWrecks = true;
+            int wrecks = 0;
+            Repeat(120, 1000, 834, list => { if (list.Exists(s => s.derelict)) wrecks++; });
+            Assert.Greater(wrecks, 0, "enabled per-system and globally");
+        }
+
     }
 }
