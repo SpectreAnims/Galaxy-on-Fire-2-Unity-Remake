@@ -115,6 +115,8 @@ namespace GoF2Remake.Modding
         public static OrbitSpec OrbitOf(int station) => orbits.TryGetValue(station, out var o) ? o : null;
         /// <summary>A station's docking pads outside (stations.json "orbit.pads"), empty = none.</summary>
         public static List<SpacePoints.Point> StationPads(int station) => OrbitOf(station)?.pads ?? new List<SpacePoints.Point>();
+        /// <summary>Manually authored station-side docking arm / berth attachment points, independent of NPC pads.</summary>
+        public static IReadOnlyList<ExternalDockPointSpec> ExternalDockPoints(int station) => OrbitOf(station)?.externalDocks ?? (IReadOnlyList<ExternalDockPointSpec>)Array.Empty<ExternalDockPointSpec>();
         /// <summary>Pirates hold 'station' of 'system' (stations.json "orbit.pirateHeld", else systems.json "pirateHeld").</summary>
         public static bool PirateHeld(int station, int system) => OrbitOf(station)?.pirateHeld ?? systemPirateHeld.Contains(system);
         /// <summary>Remake (a modder's wish, 2026-10-18): systems.json "pirateHideout", the traffic of the game's pirate loot
