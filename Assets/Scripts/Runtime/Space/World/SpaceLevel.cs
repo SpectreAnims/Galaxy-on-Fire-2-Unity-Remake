@@ -423,6 +423,7 @@ namespace GoF2Remake.World
             Navigation = Player.gameObject.AddComponent<Navigation>();
             Navigation.Setup(db, Layout, backdrop, Player, Mining, chase, Weapons);
             Navigation.StationObject = Station;
+            if (GoF2Remake.UI.ModBuilderPlay.ExternalDockTestSpawned) HoldForExternalDockTest();
             // the flight goes on across the load
             if (warpArrival || interstellar) Navigation.Drive?.CarrySpeed(warpArrival ? WarpSky.ArrivalCarryMs : WarpSky.EntryCarryMs);
             foreach (var m in Mobiles) Navigation.AddMobileStation(m.transform, m.Station, m.Label, m.TechLevel);
@@ -712,6 +713,16 @@ namespace GoF2Remake.World
             if (Health != null && Health.Target != null) Health.Target.invulnerable = true;
             if (Weapons != null) Weapons.Blocked = true;
             if (chase != null) chase.enabled = false;
+        }
+
+        /// <summary>Mod Builder external-docking spawn: hold the ship exactly on its authored attachment pose for collision testing.</summary>
+        void HoldForExternalDockTest()
+        {
+            if (Player == null) return;
+            Player.externalControl = true;
+            Player.inputLocked = true;
+            if (Health != null && Health.Target != null) Health.Target.invulnerable = true;
+            if (Weapons != null) Weapons.Blocked = true;
         }
 
         /// <summary>Multiplayer: the orbit as the other players see it: the station's index, or an arena match's own id
