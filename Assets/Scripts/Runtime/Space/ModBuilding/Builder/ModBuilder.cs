@@ -274,6 +274,7 @@ namespace GoF2Remake.Modding
         {
             if (!PlayTesting) return;
             PlayTesting = false;
+            GoF2Remake.UI.ModBuilderPlay.ResetExternalDockTest();
             ResetGame(Project);
             ApplyShip();
             Debug.Log("Mod Builder: play test over");
