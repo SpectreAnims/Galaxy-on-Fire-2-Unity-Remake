@@ -37,6 +37,8 @@ namespace GoF2Remake.Data
         /// seat and the damage smoke's points (game units in position_engine's axes, like the mounts) and the explosion's
         /// size when the ship dies (x the fighters' 1).</summary>
         [System.NonSerialized] public float[] chaseCamera;
+        /// <summary>Per-ship free-look orbit radius in game units.</summary>
+        [System.NonSerialized] public float orbitCameraDistance = 3800f;
         [System.NonSerialized] public Vector3? cockpit;
         [System.NonSerialized] public List<Vector3> smokePoints;
         [System.NonSerialized] public float explosionScale = 1f;
@@ -91,6 +93,9 @@ namespace GoF2Remake.Data
         public int index;
         public string name;
         public int securityLevel;
+        /// <summary>Modding: systems.json population, the ambient NPC traffic multiplier (0 = none, 1 = unchanged).</summary>
+        [System.NonSerialized] public float ambientPopulation = 1f;
+        [System.NonSerialized] public bool derelictFreighters = true;
         public bool initiallyVisible;
         public string race;
         public int raceId;
