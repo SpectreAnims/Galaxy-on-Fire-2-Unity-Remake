@@ -158,6 +158,25 @@ namespace GoF2Remake.Modding
                 if (held.Type != JTokenType.Boolean) throw new ModJsonException($"{where}: orbit \"pirateHeld\" is true or false");
                 s.pirateHeld = (bool)held;
             }
+            if (ModJson.Get(o, "externalDocks") is JToken externalToken)
+            {
+                if (!(externalToken is JArray externalList))
+                    throw new ModJsonException($"{where}: orbit \"externalDocks\" must be a list [ {{ \"id\": \"arm_a\", \"position\": [x, y, z], \"rotation\": [x, y, z] }} ]");
+                s.externalDocks = new List<ExternalDockPointSpec>();
+                var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var entry in externalList)
+                {
+                    if (!(entry is JObject point)) throw new ModJsonException($"{where}: each external docking point must be an object");
+                    string id = ModJson.Str(point, "id");
+                    var position = Xyz(point, "position", where);
+                    if (string.IsNullOrWhiteSpace(id) || !ids.Add(id))
+                        throw new ModJsonException($"{where}: each external docking point needs a unique non-empty \"id\"");
+                    if (!position.HasValue) throw new ModJsonException($"{where}: external docking point \"{id}\" needs \"position\"");
+                    var rotation = Xyz(point, "rotation", where) ?? Vector3.zero;
+                    s.externalDocks.Add(new ExternalDockPointSpec { id = id, position = position.Value, rotation = rotation });
+                }
+                if (s.externalDocks.Count == 0) s.externalDocks = null;
+            }
             if (ModJson.Get(o, "pads") is JToken padsToken)
             {
                 // Like npcships.json's "docking.pads": the approach 2000 units above the pad unless given, facing game +z.
