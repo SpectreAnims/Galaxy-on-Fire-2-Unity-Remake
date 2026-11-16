@@ -8,6 +8,7 @@
 //       "autocomplete": true | false | 1500000 (the price; true = the original's 1.25 x the product's price),
 //       "available": "condition"               (EventRunner.Condition: before any source offers it),
 //       "unlocked": false                      (true: known as soon as it is available),
+//       "multiplayerBlueprintRestricted": false (ordinary acquisition and production barred during multiplayer),
 //       "lounge": { "chance": 10, "price": 250000, "systemRace": -1 }   (a Space Lounge visitor sells it;
 //                 "stations": [ 78, "mod:id" ]  only in those bars (then the chance defaults to 100): like the game's own
 //                                               blueprint sellers, one at a fixed station;
