@@ -175,6 +175,30 @@ namespace GoF2Remake.Tests
         }
 
         [Test]
+        public void GeneratedShipBlueprintCanBeRestricted()
+        {
+            string dir = WriteMod("bp", "t_bpship", "1.0", "",
+                ("ships.json", "[ { 'id': 'yacht', 'model': 'y.glb', 'name': 'Yacht', 'price': 777000 } ]"),
+                ("blueprints.json", "[ { 'id': 'yacht_bp', 'ship': 't_bpship:yacht', 'ingredients': [ { 'item': 155 } ], 'multiplayerBlueprintRestricted': true } ]"));
+            WriteFile(dir, "y.glb", Dummy);
+            ScanAndEnable("t_bpship");
+            var db = Database.Load();
+            int deed = ModContent.ItemIndexOf("t_bpship:blueprint:yacht_bp");
+            Assert.GreaterOrEqual(deed, 0);
+            Assert.IsNotNull(ModBlueprints.Of(deed));
+
+            var previous = NetSession.ActiveProvider;
+            try
+            {
+                NetSession.ActiveProvider = () => true;
+                Assert.IsTrue(ModContent.IsBlueprintRestricted(deed), "the generated ship deed is restricted");
+                Assert.IsFalse(Blueprints.Produce(db, deed, 10), "the ship cannot be manufactured");
+            }
+            finally { NetSession.ActiveProvider = previous; }
+            Assert.IsFalse(ModContent.IsBlueprintRestricted(deed), "solo play is unchanged");
+        }
+
+        [Test]
         public void MultiplayerBlueprintRestrictionMustBeBoolean()
         {
             string dir = WriteMod("p", "t_bperr", "1.0", "", ("items.json",
