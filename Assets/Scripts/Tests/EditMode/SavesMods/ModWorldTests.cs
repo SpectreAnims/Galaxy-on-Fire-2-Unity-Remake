@@ -11,6 +11,7 @@ using System.Linq;
 using GoF2Remake.Data;
 using GoF2Remake.Modding;
 using NUnit.Framework;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 namespace GoF2Remake.Tests
@@ -999,5 +1000,23 @@ namespace GoF2Remake.Tests
             StringAssert.Contains("unique non-empty", WorldError("stations.json", "[ { 'override': 1, 'orbit': { 'externalDocks': [ { 'id': 'arm', 'position': [0,0,0] }, { 'id': 'ARM', 'position': [1,0,0] } ] } } ]"));
 
         [Test] public void APadNeedsAPosition() => StringAssert.Contains("a pad needs \"position\"", WorldError("stations.json", "[ { 'override': 1, 'orbit': { 'pads': [ { 'facing': [0, 0, 1] } ] } } ]"));
+        [Test]
+        public void ShipExternalDockIsAnExplicitHardpoint()
+        {
+            var ship = new ShipData();
+            var json = JObject.Parse("{ 'externalDock': { 'position': [125, 80, -640], 'rotation': [0, 180, 0] } }");
+            ModShipView.ApplyShip(ship, json);
+            Assert.AreEqual(new Vector3(125, 80, -640), ship.externalDockPosition.Value);
+            Assert.AreEqual(new Vector3(0, 180, 0), ship.externalDockRotation);
+        }
+
+        [Test]
+        public void ShipWithoutExternalDockHardpointIsNotEligible()
+        {
+            var ship = new ShipData();
+            ModShipView.ApplyShip(ship, JObject.Parse("{ 'camera': { 'distance': 2000 } }"));
+            Assert.IsFalse(ship.externalDockPosition.HasValue);
+        }
+
     }
 }
