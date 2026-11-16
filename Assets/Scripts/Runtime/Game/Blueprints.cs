@@ -171,7 +171,7 @@ namespace GoF2Remake.Data
         /// ADD), which Withdraw may give back; the story's pre-investments (UnlockFromStory) are not.</summary>
         public static void Invest(Database db, int product, int ingredient, int units, int station, bool byPlayer = false)
         {
-            if (units <= 0) return;
+            if (units <= 0 || byPlayer && IsRestricted(product)) return;
             var s = State(db, product);
             var it = db.Item(product);
             int slot = it.blueprint.FindIndex(p => p.item == ingredient);
