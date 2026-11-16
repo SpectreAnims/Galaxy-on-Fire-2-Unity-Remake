@@ -3,6 +3,7 @@
 
 using GoF2Remake.Data;
 using GoF2Remake.Flight;
+using GoF2Remake.Modding;
 using GoF2Remake.Visuals;
 using GoF2Remake.UI;
 using UnityEngine;
