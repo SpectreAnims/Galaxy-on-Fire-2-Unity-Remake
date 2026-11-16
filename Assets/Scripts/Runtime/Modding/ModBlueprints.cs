@@ -43,7 +43,7 @@ namespace GoF2Remake.Modding
 
         static readonly HashSet<string> Fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "id", "ship", "item", "ingredients", "requiresShip", "autocomplete", "available", "unlocked", "lounge", "derelict", "drops",
+            "id", "ship", "item", "ingredients", "requiresShip", "autocomplete", "available", "unlocked", "lounge", "derelict", "drops", "multiplayerBlueprintRestricted",
         };
         static readonly HashSet<string> DerelictFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "chance", "race", "stations", "position" };
 
@@ -59,7 +59,7 @@ namespace GoF2Remake.Modding
             public ModInfo mod;
             public string where, localId, shipRef, itemRef, requiresShipRef, available;
             public readonly List<(string item, int amount)> ingredients = new List<(string, int)>();
-            public bool autocomplete = true, unlocked;
+            public bool autocomplete = true, unlocked, multiplayerBlueprintRestricted, hasMultiplayerBlueprintRestriction;
             public int autocompletePrice = -1;          // -1: the original's formula
             public float loungeChance, derelictChance;  // 0: no such source
             public int loungePrice, loungeRace = -1, derelictRace = -1;
@@ -102,6 +102,8 @@ namespace GoF2Remake.Modding
                     mod = mod, where = where, localId = ModJson.Str(o, "id"), shipRef = ModJson.Str(o, "ship"), itemRef = ModJson.Str(o, "item"),
                     requiresShipRef = ModJson.Str(o, "requiresShip"), available = ModJson.Str(o, "available"),
                     unlocked = ModJson.Bool(o, "unlocked", false, File),
+                    hasMultiplayerBlueprintRestriction = ModJson.Has(o, "multiplayerBlueprintRestricted"),
+                    multiplayerBlueprintRestricted = ModJson.Bool(o, "multiplayerBlueprintRestricted", false, File),
                 };
                 if (string.IsNullOrEmpty(d.localId) || !ModManifest.ValidId(d.localId))
                     throw new ModJsonException($"{where}: \"id\" is missing or uses more than a-z, 0-9, _ and -");
@@ -259,6 +261,8 @@ namespace GoF2Remake.Modding
                         if (ModContent.TryResolveShip(sr, out int si) && db.Ship(si) != null) d.shipDrops.Add((si, chance));
                         else Warn(d, $"\"drops\" \"ship\": {sr} is no ship");
                     product.blueprint = parts;
+                    if (d.hasMultiplayerBlueprintRestriction)
+                        ModContent.SetBlueprintRestricted(d.product, d.multiplayerBlueprintRestricted);
                     byProduct[d.product] = d;
                 }
                 catch (Exception e) { Warn(d, e.Message); }
