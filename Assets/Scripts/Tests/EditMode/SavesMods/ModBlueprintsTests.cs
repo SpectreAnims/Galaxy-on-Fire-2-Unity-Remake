@@ -199,6 +199,24 @@ namespace GoF2Remake.Tests
         }
 
         [Test]
+        public void BlueprintDefinitionCanClearAnItemRestriction()
+        {
+            WriteMod("bp", "t_bpprec", "1.0", "",
+                ("items.json", "[ { 'id': 'gun', 'base': 2, 'multiplayerBlueprintRestricted': true } ]"),
+                ("blueprints.json", "[ { 'id': 'gun_bp', 'item': 't_bpprec:gun', 'ingredients': [ { 'item': 155 } ], 'multiplayerBlueprintRestricted': false } ]"));
+            ScanAndEnable("t_bpprec");
+            Database.Load();
+            int product = ModContent.ItemIndexOf("t_bpprec:gun");
+            var previous = NetSession.ActiveProvider;
+            try
+            {
+                NetSession.ActiveProvider = () => true;
+                Assert.IsFalse(ModContent.IsBlueprintRestricted(product), "the explicit blueprint setting takes precedence");
+            }
+            finally { NetSession.ActiveProvider = previous; }
+        }
+
+        [Test]
         public void MultiplayerBlueprintRestrictionMustBeBoolean()
         {
             string dir = WriteMod("p", "t_bperr", "1.0", "", ("items.json",
