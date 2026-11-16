@@ -159,6 +159,8 @@ namespace GoF2Remake.Tests
                 Assert.AreEqual(0, ModBlueprints.Offerable(d => true).Count, "no lounge, drop or derelict source");
                 ModBlueprints.UnlockAvailable();
                 Assert.IsFalse(Blueprints.IsUnlocked(product), "automatic unlock is blocked");
+                Blueprints.Unlock(product);
+                Assert.IsTrue(Blueprints.IsUnlocked(product), "an explicit scripted unlock remains intact");
                 var state = Blueprints.State(db, product);
                 int remaining = state.remaining[0];
                 Blueprints.Invest(db, product, 155, 1, 10, true);
@@ -222,7 +224,12 @@ namespace GoF2Remake.Tests
             string dir = WriteMod("p", "t_bperr", "1.0", "", ("items.json",
                 "[ { 'id': 'x', 'base': 2, 'multiplayerBlueprintRestricted': 'yes' } ]"));
             var m = OpenParsed(dir);
-            Assert.IsTrue(m.Broken, "accepted a non-boolean restriction");
+            Assert.IsTrue(m.Broken, "accepted a non-boolean item restriction");
+
+            dir = WriteMod("p", "t_bperr2", "1.0", "", ("blueprints.json",
+                "[ { 'id': 'x', 'item': 2, 'ingredients': [ { 'item': 155 } ], 'multiplayerBlueprintRestricted': 'yes' } ]"));
+            m = OpenParsed(dir);
+            Assert.IsTrue(m.Broken, "accepted a non-boolean blueprint restriction");
         }
 
         [Test]
