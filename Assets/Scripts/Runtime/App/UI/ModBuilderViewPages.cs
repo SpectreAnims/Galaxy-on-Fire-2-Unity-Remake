@@ -7,6 +7,7 @@ using System.Linq;
 using GoF2Remake.Data;
 using GoF2Remake.Modding;
 using GoF2Remake.World;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
@@ -386,7 +387,58 @@ namespace GoF2Remake.UI
             if (s.Mounts.Count == 0) Note(hardpoints, T("mbNoPoints", "No hardpoints: pick a kind above, then click on the hull."));
             if (s.IsKitShip) Note(hardpoints, T("mbKitShipPoints", "A kit ship's hardpoints come from its parts; these only cover kinds no part has."));
             BuildSelectedPoint();
+            BuildExternalDockHardpoint(s);
         }
+
+        /// <summary>The ship's single external docking hardpoint, authored in the same game-unit axes as weapon mounts.</summary>
+        void BuildExternalDockHardpoint(ProjectShip s)
+        {
+            Heading(hardpoints, T("mbExternalDock", "External docking hardpoint"));
+            if (!(s.Get("externalDock") is JObject dock))
+            {
+                Note(hardpoints, T("mbExternalDockMissing", "Not assigned. This ship cannot use external docking."));
+                Act(hardpoints, T("mbExternalDockAdd", "+ Add docking hardpoint"), () =>
+                {
+                    s.Set("externalDock", new JObject
+                    {
+                        ["position"] = new JArray(0, 0, 0),
+                        ["rotation"] = new JArray(0, 0, 0)
+                    });
+                    MarkDirty();
+                    BuildHardpointsPage();
+                }, "mbv-add");
+                return;
+            }
+
+            JArray position = dock["position"] as JArray ?? new JArray(0, 0, 0);
+            JArray rotation = dock["rotation"] as JArray ?? new JArray(0, 0, 0);
+            int Read(JArray a, int i) => a.Count > i && int.TryParse(a[i]?.ToString(), out int n) ? n : 0;
+            void Write(JArray a, int i, int value)
+            {
+                while (a.Count <= i) a.Add(0);
+                a[i] = value;
+                MarkDirty();
+            }
+
+            Note(hardpoints, T("mbExternalDockHelp", "Position is the ship attachment point (X left, Y up, Z forward). Rotation is its local orientation. The station arm is aligned to this point."));
+            Heading(hardpoints, T("mbExternalDockPosition", "Position"));
+            var posRow = Add(hardpoints, new VisualElement(), "mbv-row", "mbv-xyz");
+            Int(posRow, "X", Read(position, 0), -200000, 200000, v => Write(position, 0, v));
+            Int(posRow, "Y", Read(position, 1), -200000, 200000, v => Write(position, 1, v));
+            Int(posRow, "Z", Read(position, 2), -200000, 200000, v => Write(position, 2, v));
+            Heading(hardpoints, T("mbExternalDockRotation", "Rotation"));
+            var rotRow = Add(hardpoints, new VisualElement(), "mbv-row", "mbv-xyz");
+            Int(rotRow, "X", Read(rotation, 0), -360, 360, v => Write(rotation, 0, v));
+            Int(rotRow, "Y", Read(rotation, 1), -360, 360, v => Write(rotation, 1, v));
+            Int(rotRow, "Z", Read(rotation, 2), -360, 360, v => Write(rotation, 2, v));
+            Act(hardpoints, T("mbExternalDockRemove", "Remove docking hardpoint"), () =>
+            {
+                s.Set("externalDock", null);
+                MarkDirty();
+                BuildHardpointsPage();
+            }, "mbv-danger");
+        }
+
         void BuildSelectedPoint(VisualElement into = null)
         {
             var s = EditedMounts;
