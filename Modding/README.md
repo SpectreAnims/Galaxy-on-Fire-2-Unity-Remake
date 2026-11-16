@@ -994,7 +994,8 @@ How a ship is seen, for a new ship or an original through `override` (each one o
 "camera": { "distance": 2400, "height": 900, "lookHeight": 900, "lookAhead": -1100 },
 "cockpit": [0, 90, 760],
 "smoke": [[39, 68, -64], [-62, 65, 10]],
-"explosionScale": 1.2
+"explosionScale": 1.2,
+"externalDock": { "position": [0, 120, -900], "rotation": [0, 180, 0] }
 ```
 
 - `camera`: the chase camera, in game units: `distance` behind the ship's pivot and `height` above it, aimed at a point
@@ -1008,6 +1009,9 @@ How a ship is seen, for a new ship or an original through `override` (each one o
   them it smokes from its middle. The smoke is shared between the points, so two points don't make twice as much.
 - `explosionScale`: how big the explosion is when the ship dies, as a multiple of a fighter's (1); 0.25 to 20. The NPC
   ships, the player's ship and other players' ships use it. Freighters and capital ships keep their own.
+- `externalDock`: an optional exterior-docking hardpoint. `position` is a point in the ship's `position_engine` axes
+  (x left, y up, z nose), in game units; `rotation` is local Euler degrees. The ship is eligible for external docking only
+  when this hardpoint is explicitly assigned. It is independent of weapon mounts and never inferred from ship size.
 
 The Mod Builder has them on a ship's page under **Camera and damage**.
 
@@ -1988,6 +1992,22 @@ ahead of it; pitch up from the horizon.
 Keep the jumpgate, the field and the arrival within 10 km (200 000 units) of the station: the game's own lie within 6 km,
 and the view reaches 15 km. A launching ship flies along +z: leave room there for the departure. The Mod Builder's Stations
 page has every field (Its orbit) and **Show its orbit** shows the result.
+
+For large ships, use `orbit.externalDocks` instead of `orbit.pads`. These are manually placed station-side docking-arm / berth
+hardpoints, independent of NPC pads:
+
+```json
+"orbit": {
+    "externalDocks": [
+        { "id": "port_fore", "position": [12000, 3500, -8000], "rotation": [0, 90, 0] },
+        { "id": "port_aft", "position": [-9000, 2500, 11000] }
+    ]
+}
+```
+
+Each point needs a unique `id` and a `position` in station-local game units; `rotation` is optional (Euler degrees, default
+zero). The corresponding ship must have its own `externalDock` hardpoint assigned. NPC `orbit.pads` are a separate system
+and are not used for large-ship docking.
 
 The docking range and the launch point grow with a big model: the "Dock" prompt shows within its radius plus 300 m, and a
 launch starts 150 m clear of it. Station models load in the background with the ships while the game starts (the loading
