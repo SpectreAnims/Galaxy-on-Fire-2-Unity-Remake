@@ -566,6 +566,31 @@ namespace GoF2Remake.UI
                 Save(true);
             }, "mbv-add");
 
+            // Large-ship docking arms / berths: separate from the small NPC docking pads above.
+            Add(stationPage, new Label(T("mbOrbitExternalDocks", "External docking arms / berths")), "mbv-inline-label");
+            Note(stationPage, T("mbOrbitExternalDocksNote", "Place these on the station model where a large ship should attach. Each needs a unique ID; the ship must also have an external docking hardpoint."));
+            if (o["externalDocks"] is JArray externalDocks)
+                foreach (var dock in externalDocks.OfType<JObject>().ToList())
+                {
+                    string id = (string)dock["id"] ?? "external";
+                    var row = Row(stationPage);
+                    Add(row, new Label(string.Format(T("mbOrbitExternalDockTitle", "Docking arm: {0}"), id)), "mbv-inline-label");
+                    Act(row, "×", () => { externalDocks.Remove(dock); if (externalDocks.Count == 0) o.Remove("externalDocks"); Save(true); }, "mbv-step");
+                    Text(stationPage, T("mbOrbitExternalDockId", "Docking point ID"), id, 32, v => { dock["id"] = v.Trim(); Save(); });
+                    XyzRow(stationPage, T("mbOrbitExternalDockAt", "Attachment position"), dock, "position", () => Save());
+                    if (dock["rotation"] == null) dock["rotation"] = new JArray(0, 0, 0);
+                    XyzRow(stationPage, T("mbOrbitExternalDockRotation", "Attachment rotation (Euler degrees)"), dock, "rotation", () => Save());
+                }
+            Act(stationPage, T("mbOrbitAddExternalDock", "+ External docking point"), () =>
+            {
+                var list = o["externalDocks"] as JArray ?? new JArray();
+                int n = 1;
+                while (list.OfType<JObject>().Any(d => string.Equals((string)d["id"], "arm_" + n, System.StringComparison.OrdinalIgnoreCase))) n++;
+                list.Add(new JObject { ["id"] = "arm_" + n, ["position"] = new JArray(0, 0, 0), ["rotation"] = new JArray(0, 0, 0) });
+                o["externalDocks"] = list;
+                Save(true);
+            }, "mbv-add");
+
             // The asteroid field.
             var ast = o["asteroids"];
             int astMode = ast == null ? 0 : ast.Type == JTokenType.Boolean ? ((bool)ast ? 0 : 1) : 2;
