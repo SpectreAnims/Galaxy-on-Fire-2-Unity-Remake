@@ -51,6 +51,12 @@ namespace GoF2Remake.World
         {
             if (ship != null && ship.Spec.modBlueprint >= 0)
             {
+                if (Blueprints.IsRestricted(ship.Spec.modBlueprint))
+                {
+                    ship.DockingType = 0;
+                    GameHooks.FlightMessage?.Invoke(Localization.Extra("bpRestricted", "This blueprint is unavailable in this multiplayer session."));
+                    return;
+                }
                 // Remake mods: a derelict's blueprint is learnt at once, like the hidden blueprints' (players' feedback,
                 // 2026-11-13: it was a data crate to pull in, which needs a tractor beam; #242: players didn't know to).
                 ship.DockingType = 0;
@@ -76,7 +82,8 @@ namespace GoF2Remake.World
             }
             if (ship != null && ship.Spec.eventWreck) { ship.DockingType = 0; return; }   // an event's wreck: its "on hacked" does the rest
             int k = ship != null ? ship.Spec.hiddenBlueprint : -1;
-            if (k < 0 || k >= TrafficPlan.HiddenBlueprints.Length || (Session.HiddenBlueprintsFound & (1 << k)) != 0) return;
+            if (k < 0 || k >= TrafficPlan.HiddenBlueprints.Length || (Session.HiddenBlueprintsFound & (1 << k)) != 0
+                || Blueprints.IsRestricted(TrafficPlan.HiddenBlueprints[k].blueprint)) return;
             Session.HiddenBlueprintsFound |= 1 << k;
             Blueprints.Unlock(TrafficPlan.HiddenBlueprints[k].blueprint);
             ship.DockingType = 0;
