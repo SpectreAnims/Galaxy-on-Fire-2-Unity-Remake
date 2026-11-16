@@ -142,7 +142,7 @@ namespace GoF2Remake.Tests
         public void ItemBlueprintRestrictionsApplyOnlyInMultiplayer()
         {
             WriteMod("bp", "t_bp", "1.0", "",
-                ("items.json", "[ { 'id': 'gun', 'base': 2, 'multiplayerBlueprintRestricted': true }, { 'override': 85, 'multiplayerBlueprintRestricted': true } ]"),
+                ("items.json", "[ { 'id': 'gun', 'base': 2, 'multiplayerBlueprintRestricted': true }, { 'override': 85, 'multiplayerBlueprintRestricted': true }, { 'override': 85, 'multiplayerBlueprintRestricted': false }, { 'override': 179, 'multiplayerBlueprintRestricted': true } ]"),
                 ("blueprints.json", "[ { 'id': 'gun_bp', 'item': 't_bp:gun', 'ingredients': [ { 'item': 155 } ], 'unlocked': true, 'lounge': { 'chance': 100 }, 'drops': [ { 'race': 'pirate' } ], 'derelict': { 'chance': 100 } } ]"));
             ScanAndEnable("t_bp");
             var db = Database.Load();
@@ -154,7 +154,8 @@ namespace GoF2Remake.Tests
             {
                 NetSession.ActiveProvider = () => true;
                 Assert.IsTrue(ModContent.IsBlueprintRestricted(product), "new mod item");
-                Assert.IsTrue(ModContent.IsBlueprintRestricted(85), "vanilla item override");
+                Assert.IsFalse(ModContent.IsBlueprintRestricted(85), "a later explicit false clears an earlier override");
+                Assert.IsTrue(ModContent.IsBlueprintRestricted(179), "another vanilla item override");
                 Assert.AreEqual(0, ModBlueprints.Offerable(d => true).Count, "no lounge, drop or derelict source");
                 ModBlueprints.UnlockAvailable();
                 Assert.IsFalse(Blueprints.IsUnlocked(product), "automatic unlock is blocked");
@@ -166,6 +167,7 @@ namespace GoF2Remake.Tests
 
             Assert.IsFalse(ModContent.IsBlueprintRestricted(product), "solo play is unchanged");
             Assert.IsFalse(ModContent.IsBlueprintRestricted(85), "solo play is unchanged for overrides");
+            Assert.IsFalse(ModContent.IsBlueprintRestricted(179), "solo play is unchanged for overrides");
         }
 
         [Test]
