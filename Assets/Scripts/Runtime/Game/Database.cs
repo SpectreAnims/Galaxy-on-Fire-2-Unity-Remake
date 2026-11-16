@@ -36,6 +36,10 @@ namespace GoF2Remake.Data
         /// point's height and how far ahead of the pivot it is: the original's 1338 / 600 / 600 / -650), the cockpit view's
         /// seat and the damage smoke's points (game units in position_engine's axes, like the mounts) and the explosion's
         /// size when the ship dies (x the fighters' 1).</summary>
+        /// <summary>Modding: explicit exterior-docking hardpoint (ships.json "externalDock": position/rotation in game units/degrees).
+        /// Null means this ship is not eligible for external docking.</summary>
+        [System.NonSerialized] public Vector3? externalDockPosition;
+        [System.NonSerialized] public Vector3 externalDockRotation;
         [System.NonSerialized] public float[] chaseCamera;
         [System.NonSerialized] public Vector3? cockpit;
         [System.NonSerialized] public List<Vector3> smokePoints;
