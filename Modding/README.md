@@ -79,6 +79,7 @@ What mods can do so far:
 - **Add new items**: weapons, missiles, equipment and goods. Each new item is based on an existing one and takes its model,
   icon, sounds and behaviour, with its own name, description, stats, prices and availability.
 - **Change existing items**: rebalance prices, stats, tech levels and availability.
+- **Restrict blueprints in multiplayer**: set `"multiplayerBlueprintRestricted": true` in an `items.json` entry (new item or override). This prevents ordinary blueprint discovery and production during multiplayer sessions; it does not affect solo play, NPC equipment, scripted story unlocks or direct scripted item rewards. Omitting the field or setting it to `false` leaves the item unrestricted (and a later override can clear an earlier mod's setting).
 - **Give weapons their own look and sound**: projectiles, muzzle flashes and impacts from your own sprites or 3D models,
   your own shot and explosion sounds.
 - **Add new ships**: your own 3D model (glTF / GLB) with its stats, weapon mounts, turrets, engine glows and textures, sold
