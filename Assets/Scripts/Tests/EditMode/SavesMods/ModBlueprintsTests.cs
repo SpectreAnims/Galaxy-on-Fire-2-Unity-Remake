@@ -139,6 +139,45 @@ namespace GoF2Remake.Tests
         }
 
         [Test]
+        public void ItemBlueprintRestrictionsApplyOnlyInMultiplayer()
+        {
+            WriteMod("bp", "t_bp", "1.0", "",
+                ("items.json", "[ { 'id': 'gun', 'base': 2, 'multiplayerBlueprintRestricted': true }, { 'override': 85, 'multiplayerBlueprintRestricted': true } ]"),
+                ("blueprints.json", "[ { 'id': 'gun_bp', 'item': 't_bp:gun', 'ingredients': [ { 'item': 155 } ], 'unlocked': true, 'lounge': { 'chance': 100 }, 'drops': [ { 'race': 'pirate' } ], 'derelict': { 'chance': 100 } } ]"));
+            ScanAndEnable("t_bp");
+            var db = Database.Load();
+            int product = ModContent.ItemIndexOf("t_bp:gun");
+            Assert.GreaterOrEqual(product, 0);
+
+            var previous = NetSession.ActiveProvider;
+            try
+            {
+                NetSession.ActiveProvider = () => true;
+                Assert.IsTrue(ModContent.IsBlueprintRestricted(product), "new mod item");
+                Assert.IsTrue(ModContent.IsBlueprintRestricted(85), "vanilla item override");
+                Assert.AreEqual(0, ModBlueprints.Offerable(d => true).Count, "no lounge, drop or derelict source");
+                ModBlueprints.UnlockAvailable();
+                Assert.IsFalse(Blueprints.IsUnlocked(product), "automatic unlock is blocked");
+                int produced = Session.GoodsProduced;
+                Assert.IsFalse(Blueprints.Produce(db, product, 10), "production is blocked below the hangar UI");
+                Assert.AreEqual(produced, Session.GoodsProduced, "a rejected production does not count");
+            }
+            finally { NetSession.ActiveProvider = previous; }
+
+            Assert.IsFalse(ModContent.IsBlueprintRestricted(product), "solo play is unchanged");
+            Assert.IsFalse(ModContent.IsBlueprintRestricted(85), "solo play is unchanged for overrides");
+        }
+
+        [Test]
+        public void MultiplayerBlueprintRestrictionMustBeBoolean()
+        {
+            string dir = WriteMod("p", "t_bperr", "1.0", "", ("items.json",
+                "[ { 'id': 'x', 'base': 2, 'multiplayerBlueprintRestricted': 'yes' } ]"));
+            var m = OpenParsed(dir);
+            Assert.IsTrue(m.Broken, "accepted a non-boolean restriction");
+        }
+
+        [Test]
         public void ABadProductIsAWarning()
         {
             WriteMod("bp", "t_bp2", "1.0", "", ("blueprints.json",
