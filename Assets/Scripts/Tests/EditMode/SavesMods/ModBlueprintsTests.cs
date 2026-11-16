@@ -159,6 +159,10 @@ namespace GoF2Remake.Tests
                 Assert.AreEqual(0, ModBlueprints.Offerable(d => true).Count, "no lounge, drop or derelict source");
                 ModBlueprints.UnlockAvailable();
                 Assert.IsFalse(Blueprints.IsUnlocked(product), "automatic unlock is blocked");
+                var state = Blueprints.State(db, product);
+                int remaining = state.remaining[0];
+                Blueprints.Invest(db, product, 155, 1, 10, true);
+                Assert.AreEqual(remaining, state.remaining[0], "player investment is blocked");
                 int produced = Session.GoodsProduced;
                 Assert.IsFalse(Blueprints.Produce(db, product, 10), "production is blocked below the hangar UI");
                 Assert.AreEqual(produced, Session.GoodsProduced, "a rejected production does not count");
