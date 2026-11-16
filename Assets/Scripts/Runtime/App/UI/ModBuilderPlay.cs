@@ -28,7 +28,11 @@ namespace GoF2Remake.UI
                 return Localization.Extra("mbExternalDockShipMissing", "This ship has no external docking hardpoint. Add one on its Hardpoints page first.");
             if (point == null)
                 return Localization.Extra("mbExternalDockStationMissing", "That station docking point is no longer available. Check the station's orbit settings.");
-            if (!PlayerHull.Big)
+            int previousShip = Session.ShipIndex;
+            Session.ShipIndex = shipIndex;
+            bool largeHull = PlayerHull.Big;
+            Session.ShipIndex = previousShip;
+            if (!largeHull)
                 return Localization.Extra("mbExternalDockShipSmall", "External docking is for large ships. This ship's hull is not classified as large.");
 
             var projectShip = ModBuilder.Project?.Ships.FirstOrDefault(p => ModBuilder.IndexOf(p) == shipIndex);
