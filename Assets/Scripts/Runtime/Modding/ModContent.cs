@@ -398,6 +398,8 @@ namespace GoF2Remake.Modding
             // "stock": how many units a shop holds (Shop.ModStock), a number or [least, most].
             if (Range(o, "stock", out int smin, out int smax) && (smin < 1 || smax < smin || smax > Shop.MaxStock))
                 mod.Warnings.Add($"{where}: \"stock\" {smin} to {smax} must be 1 to {Shop.MaxStock}, least first (clamped)");
+            if (ModJson.Has(o, "multiplayerBlueprintRestricted"))
+                ModJson.Bool(o, "multiplayerBlueprintRestricted", false, ItemsFile);
             if (ModJson.Get(o, "tractorColor") is JToken tc && TractorColorValue(tc) < 0)
                 mod.Warnings.Add($"{where}: \"tractorColor\" must be \"#rrggbb\" or [r, g, b] (0-255): ignored");
             if (ModJson.Get(o, "stats") is JToken st)
