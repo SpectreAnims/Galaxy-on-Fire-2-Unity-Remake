@@ -17,6 +17,7 @@ namespace GoF2Remake.UI
     {
         static int externalDockTestShip = -1, externalDockTestStation = -1;
         static string externalDockTestPoint;
+        public static bool ExternalDockTestSpawned { get; private set; }
 
         /// <summary>Starts a Mod Builder test directly in space with the chosen project ship attached to a station arm.</summary>
         public static string StartExternalDock(int shipIndex, int stationIndex, string pointId)
@@ -62,6 +63,7 @@ namespace GoF2Remake.UI
             if (externalDockTestShip != ship || externalDockTestStation != station || string.IsNullOrEmpty(externalDockTestPoint))
                 return false;
             pointId = externalDockTestPoint;
+            ExternalDockTestSpawned = true;
             externalDockTestShip = externalDockTestStation = -1;
             externalDockTestPoint = null;
             return true;
@@ -107,6 +109,12 @@ namespace GoF2Remake.UI
         }
 
         /// <summary>Back to the builder.</summary>
-        public static void End() => ModBuilder.EndPlayTest();
+        public static void End()
+        {
+            ExternalDockTestSpawned = false;
+            externalDockTestShip = externalDockTestStation = -1;
+            externalDockTestPoint = null;
+            ModBuilder.EndPlayTest();
+        }
     }
 }
