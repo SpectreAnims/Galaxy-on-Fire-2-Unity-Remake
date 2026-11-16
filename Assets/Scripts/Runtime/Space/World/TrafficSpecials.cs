@@ -82,9 +82,13 @@ namespace GoF2Remake.World
             }
             if (ship != null && ship.Spec.eventWreck) { ship.DockingType = 0; return; }   // an event's wreck: its "on hacked" does the rest
             int k = ship != null ? ship.Spec.hiddenBlueprint : -1;
-            if (k < 0 || k >= TrafficPlan.HiddenBlueprints.Length || (Session.HiddenBlueprintsFound & (1 << k)) != 0
-                || Blueprints.IsRestricted(TrafficPlan.HiddenBlueprints[k].blueprint)) return;
+            if (k < 0 || k >= TrafficPlan.HiddenBlueprints.Length || (Session.HiddenBlueprintsFound & (1 << k)) != 0) return;
             Session.HiddenBlueprintsFound |= 1 << k;
+            if (Blueprints.IsRestricted(TrafficPlan.HiddenBlueprints[k].blueprint))
+            {
+                ship.DockingType = 0;
+                return;
+            }
             Blueprints.Unlock(TrafficPlan.HiddenBlueprints[k].blueprint);
             ship.DockingType = 0;
             QueueLine(3156 + k, 0, $"BLUEPRINT_RECOVERED_{k}");
