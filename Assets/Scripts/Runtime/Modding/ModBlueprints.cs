@@ -308,7 +308,8 @@ namespace GoF2Remake.Modding
         public static void UnlockAvailable()
         {
             foreach (var d in All())
-                if (d.unlocked && d.product >= 0 && !Blueprints.IsUnlocked(d.product) && Available(d)) Blueprints.Unlock(d.product);
+                if (d.unlocked && d.product >= 0 && !ModContent.IsBlueprintRestricted(d.product)
+                    && !Blueprints.IsUnlocked(d.product) && Available(d)) Blueprints.Unlock(d.product);
         }
 
         /// <summary>A ship of 'race' and type 'ship' the player destroyed: the first mod blueprint whose drop for that ship
@@ -348,7 +349,8 @@ namespace GoF2Remake.Modding
         {
             var list = new List<Def>();
             foreach (var d in All())
-                if (d.product >= 0 && byProduct.ContainsKey(d.product) && source(d) && !Blueprints.IsUnlocked(d.product) && Available(d)) list.Add(d);
+                if (d.product >= 0 && byProduct.ContainsKey(d.product) && source(d) && !ModContent.IsBlueprintRestricted(d.product)
+                    && !Blueprints.IsUnlocked(d.product) && Available(d)) list.Add(d);
             return list;
         }
     }
