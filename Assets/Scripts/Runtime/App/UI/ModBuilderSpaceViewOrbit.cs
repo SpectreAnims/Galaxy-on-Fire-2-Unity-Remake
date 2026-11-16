@@ -1,7 +1,7 @@
 // ModBuilderSpaceViewOrbit.cs
 // ModBuilderSpaceView: the Stations kind's handles in the shown orbit (part of the partial ModBuilderSpaceView; its fields
 // are in ModBuilderSpaceView.cs). Remake (a modder's suggestion: "move a station's jumpgate within its orbit"): the orbit
-// layout's places of the station being edited ("orbit" in stations.json: the jumpgate, the arrivals, the docking pads)
+// layout's places of the station being edited ("orbit" in stations.json: the jumpgate, the arrivals, NPC docking pads and external docking arms)
 // as World.ModBuilderGizmo balls bound to the station itself, whose frame makes a ball's game units the orbit's (the
 // station turns 180 deg like a ship's model is mirrored: WeaponSystem.MountToLocal then the station's rotation is
 // OrbitLayout.ToUnity). A ball drags over the station's hull (a pad) or along its arrows (Ctrl: 100-unit snap); let go,
@@ -22,7 +22,7 @@ namespace GoF2Remake.UI
     {
         ModBuilderGizmo orbitGizmo;
         readonly List<WeaponMount> orbitMounts = new List<WeaponMount>();
-        /// <summary>What each ball is: "jumpgatePosition", "arrival", or a pad's index.</summary>
+        /// <summary>What each ball is: "jumpgatePosition", "arrival", a pad index, or an external docking point index.</summary>
         readonly List<string> orbitKeys = new List<string>();
         bool orbitDragging;
         string orbitBound;
@@ -60,6 +60,10 @@ namespace GoF2Remake.UI
                 if (o["pads"] is JArray pads)
                     for (int i = 0; i < pads.Count; i++)
                         if (pads[i] is JObject pad && Units(pad["position"]) is int[] at) { orbitMounts.Add(new WeaponMount { slotType = 0, position_engine = at }); orbitKeys.Add(i.ToString()); }
+                if (o["externalDocks"] is JArray externalDocks)
+                    for (int i = 0; i < externalDocks.Count; i++)
+                        if (externalDocks[i] is JObject dock && Units(dock["position"]) is int[] at)
+                        { orbitMounts.Add(new WeaponMount { slotType = 3, position_engine = at }); orbitKeys.Add("external:" + i); }
                 orbitGizmo.Bind(orbitMounts.Count > 0 ? level.Station.transform : null, orbitMounts);
                 orbitBound = now;
             }
@@ -115,6 +119,11 @@ namespace GoF2Remake.UI
                 if (Units(padObj["position"]) is int[] old && Units(padObj["approach"]) is int[] ap)
                     padObj["approach"] = new JArray(ap[0] + p[0] - old[0], ap[1] + p[1] - old[1], ap[2] + p[2] - old[2]);
                 padObj["position"] = place;
+            }
+            else if (key.StartsWith("external:") && int.TryParse(key.Substring("external:".Length), out int externalIndex))
+            {
+                if (!(o["externalDocks"] is JArray externalDocks) || !(externalDocks.ElementAtOrDefault(externalIndex) is JObject externalDock)) return;
+                externalDock["position"] = place;
             }
             else o[key] = place;
             Put(s, "orbit", o);
