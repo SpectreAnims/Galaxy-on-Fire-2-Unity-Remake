@@ -108,6 +108,13 @@ namespace GoF2Remake.UI
             return null;
         }
 
+        public static void ResetExternalDockTest()
+        {
+            ExternalDockTestSpawned = false;
+            externalDockTestShip = externalDockTestStation = -1;
+            externalDockTestPoint = null;
+        }
+
         /// <summary>Back to the builder.</summary>
         public static void End()
         {
