@@ -974,6 +974,30 @@ namespace GoF2Remake.Tests
         [Test] public void WrecksAreAFieldOrAFlag() => StringAssert.Contains("\"wrecks\" is true, false or", WorldError("stations.json", "[ { 'override': 1, 'orbit': { 'wrecks': 3 } } ]"));
 
         [Test] public void PadsAreAList() => StringAssert.Contains("\"pads\" must be a list", WorldError("stations.json", "[ { 'override': 1, 'orbit': { 'pads': 3 } } ]"));
+        [Test]
+        public void ExternalDockingPointsAreSeparateFromNpcPads()
+        {
+            World("[ { 'override': 78, 'orbit': { 'externalDocks': [ " +
+                "{ 'id': 'port_fore', 'position': [1200, 450, -900], 'rotation': [0, 90, 0] }, " +
+                "{ 'id': 'port_aft', 'position': [-800, 300, 1400] } ] } } ]");
+            var points = ModWorld.ExternalDockPoints(78);
+            Assert.AreEqual(2, points.Count);
+            Assert.AreEqual("port_fore", points[0].id);
+            Assert.AreEqual(new Vector3(1200, 450, -900), points[0].position);
+            Assert.AreEqual(new Vector3(0, 90, 0), points[0].rotation);
+            Assert.AreEqual(Vector3.zero, points[1].rotation, "rotation defaults to zero");
+            Assert.IsEmpty(ModWorld.StationPads(78), "large-ship berths do not become NPC pads");
+        }
+
+        [Test] public void ExternalDockPointsMustBeAList() =>
+            StringAssert.Contains("\"externalDocks\" must be a list", WorldError("stations.json", "[ { 'override': 1, 'orbit': { 'externalDocks': 3 } } ]"));
+
+        [Test] public void ExternalDockPointNeedsIdAndPosition() =>
+            StringAssert.Contains("needs \"position\"", WorldError("stations.json", "[ { 'override': 1, 'orbit': { 'externalDocks': [ { 'id': 'arm' } ] } } ]"));
+
+        [Test] public void ExternalDockPointIdsMustBeUnique() =>
+            StringAssert.Contains("unique non-empty", WorldError("stations.json", "[ { 'override': 1, 'orbit': { 'externalDocks': [ { 'id': 'arm', 'position': [0,0,0] }, { 'id': 'ARM', 'position': [1,0,0] } ] } } ]"));
+
         [Test] public void APadNeedsAPosition() => StringAssert.Contains("a pad needs \"position\"", WorldError("stations.json", "[ { 'override': 1, 'orbit': { 'pads': [ { 'facing': [0, 0, 1] } ] } } ]"));
     }
 }
