@@ -51,6 +51,14 @@ namespace GoF2Remake.Modding
                 if (ModJson.Get(co, "distance") is JToken d && IsNumber(d) && (float)d <= 0f)
                     throw new ModJsonException($"{ModJson.Where(d, file)}: \"distance\" must be above 0");
             }
+            if (ModJson.Get(o, "externalDock") is JToken dock)
+            {
+                if (!(dock is JObject d)) throw new ModJsonException($"{where}: \"externalDock\" must be an object {{ \"position\": [x, y, z], \"rotation\": [x, y, z] }}");
+                if (!(ModJson.Get(d, "position") is JToken p) || !TryPoint(p, out _))
+                    throw new ModJsonException($"{where}: \"externalDock.position\" must be a point [x, y, z] (game units)");
+                if (ModJson.Get(d, "rotation") is JToken r && !TryPoint(r, out _))
+                    throw new ModJsonException($"{where}: \"externalDock.rotation\" must be Euler degrees [x, y, z]");
+            }
             if (ModJson.Get(o, "cockpit") is JToken k && !TryPoint(k, out _))
                 throw new ModJsonException($"{ModJson.Where(k, file)}: \"cockpit\" must be a point [x, y, z]");
             if (ModJson.Get(o, "smoke") is JToken s)
@@ -80,6 +88,11 @@ namespace GoF2Remake.Modding
                     if (ModJson.Get(c, CameraFields[i]) is JToken v && IsNumber(v)) cam[i] = (float)v;
                 if (cam[0] <= 0f) cam[0] = DefaultCamera[0];
                 s.chaseCamera = cam;
+            }
+            if (ModJson.Get(o, "externalDock") is JObject dock && ModJson.Get(dock, "position") is JToken dp && TryPoint(dp, out var dockPosition))
+            {
+                s.externalDockPosition = dockPosition;
+                s.externalDockRotation = ModJson.Get(dock, "rotation") is JToken dr && TryPoint(dr, out var dockRotation) ? dockRotation : Vector3.zero;
             }
             if (ModJson.Get(o, "cockpit") is JToken k && TryPoint(k, out var seat)) s.cockpit = seat;
             if (ModJson.Get(o, "smoke") is JArray list)
