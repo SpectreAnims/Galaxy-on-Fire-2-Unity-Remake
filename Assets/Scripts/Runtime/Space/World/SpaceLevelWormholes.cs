@@ -4,6 +4,7 @@
 using GoF2Remake.Data;
 using GoF2Remake.Flight;
 using GoF2Remake.Visuals;
+using GoF2Remake.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
@@ -366,6 +367,16 @@ namespace GoF2Remake.World
                 root.transform.SetPositionAndRotation(failAt, Quaternion.LookRotation(-failAt.normalized, Vector3.up));
             // Remake multiplayer: an admin's teleport into this orbit (NetTeleport) brings its own pose.
             if (SpaceHooks.TeleportPose != null && SpaceHooks.TeleportPose(out var tpPos, out var tpRot)) root.transform.SetPositionAndRotation(tpPos, tpRot);
+            // Mod Builder: spawn the selected large test ship already attached to its authored station docking arm.
+            if (ModBuilderPlay.TryConsumeExternalDockSpawn(Layout.stationIndex, Session.ShipIndex, out string externalPointId))
+            {
+                ModWorld.ExternalDockPointSpec externalPoint = null;
+                foreach (var candidate in ModWorld.ExternalDockPoints(Layout.stationIndex))
+                    if (candidate.id == externalPointId) { externalPoint = candidate; break; }
+                if (!ExternalDockingPose.TryAlign(Station != null ? Station.transform : null, externalPoint, ship, M, out var dockPose))
+                    Debug.LogError($"Mod Builder: external docking test point '{externalPointId}' could not be aligned; check the station and ship hardpoints.");
+                else root.transform.SetPositionAndRotation(dockPose.position, dockPose.rotation);
+            }
             var ctrl = root.AddComponent<ShipController>();
             var equipment = new System.Collections.Generic.List<ItemData>();
             foreach (var e in Session.Equipment) { var it = db.Item(e.item); if (it != null) equipment.Add(it); }
