@@ -234,7 +234,7 @@ namespace GoF2Remake.UI
             actions.AddToClassList("manufacturing-actions");
             list.Add(actions);
             AddProductionRow(actions, RowKind.ShopLink, Localization.Get(hangar.Storage ? 186 : 185).UiCaps(), "manufacturing-shop");   // the tab's name
-            productionAutocomplete = Blueprints.CanAutocomplete(editing)
+            productionAutocomplete = !Blueprints.IsRestricted(editing) && Blueprints.CanAutocomplete(editing)
                 ? AddProductionRow(actions, RowKind.Autocomplete, "", "manufacturing-autocomplete") : null;
             productionComplete = AddProductionRow(actions, RowKind.Complete, Localization.Extra("bpComplete", "Complete").UiCaps(),
                                                   "manufacturing-complete");
