@@ -351,6 +351,7 @@ namespace GoF2Remake.UI
         void Commit(System.Action after)
         {
             var db = level.Database;
+            if (editing >= 0 && Blueprints.IsRestricted(editing)) { Revert(); after?.Invoke(); return; }
             if (!HasPending || editing < 0) { after?.Invoke(); return; }
             var st = Blueprints.State(db, editing);
             int units = 0;
@@ -397,6 +398,7 @@ namespace GoF2Remake.UI
         }
         void Apply()
         {
+            if (editing >= 0 && Blueprints.IsRestricted(editing)) { Revert(); return; }
             var db = level.Database;
             foreach (var kv in pendingUnits)
                 if (kv.Value > 0) Blueprints.Invest(db, editing, kv.Key, kv.Value, StationIndex, true);
