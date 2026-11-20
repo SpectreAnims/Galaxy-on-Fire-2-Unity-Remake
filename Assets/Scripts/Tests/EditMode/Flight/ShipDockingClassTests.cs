@@ -187,6 +187,8 @@ namespace GoF2Remake.Tests
             Assert.IsFalse(ShipClassRules.CanDockExternally(small));
             Assert.IsTrue(ShipClassRules.CanDockExternally(large));
             Assert.IsTrue(ShipClassRules.CanHostDocking(large));
+            Assert.IsFalse(ShipClassRules.CanHostDocking(small));
+            Assert.IsFalse(ShipClassRules.CanDockWithShip(small, small));
         }
 
         [Test]
