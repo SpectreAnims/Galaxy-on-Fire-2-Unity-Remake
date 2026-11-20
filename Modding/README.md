@@ -930,6 +930,10 @@ Unclassified original ships are not assigned a new class or docking capability b
 pre-existing docking behaviour. Class-based restrictions apply when a mod explicitly classifies a ship. In particular,
 an unclassified original host/guest is not blocked by these new ship-to-ship class checks.
 
+Ship-to-ship docking uses the existing NPC resupply-deck system: the host NPC ship must have a `docking` definition
+and usable `pads` (see [Capital ships and freighters](#capital-ships-and-freighters)). Its existing access checks
+(standing, race, signature, hostility and battle state) still apply in addition to class compatibility.
+
 
 Ship and station materials are lit physically (URP Lit): they reflect the system's sky by their smoothness (the
 alpha of the metallic map) and metalness, the way PBR engines draw them. The game's own hulls add the original's shine
