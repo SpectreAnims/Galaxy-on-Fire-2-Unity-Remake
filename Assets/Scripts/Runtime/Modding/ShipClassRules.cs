@@ -101,10 +101,19 @@ namespace GoF2Remake.Modding
         /// classTags [\"docking:small\"] or [\"docking:large\"].</summary>
         public static bool CanDockWithShip(ShipData guest, ShipData host)
         {
-            if (guest == null || host == null || !CanHostDocking(host)) return false;
-            bool guestLarge = CanHostDocking(guest);
-            bool guestSmall = IsInternalDockClass(guest) || Matches(guest, new[] { SmallDockingCapability });
-            return guestLarge || guestSmall;
+            if (guest == null || host == null) return false;
+
+            // Preserve the original game's authored docking decks for ships a mod has not classified.
+            // Class rules only constrain a host or guest after a mod explicitly opts that ship in.
+            if (!IsClassified(host)) return true;
+            if (!CanHostDocking(host)) return false;
+            if (!IsClassified(guest)) return true;
+
+            // Every classified non-large hull is a small guest by default. Explicit internal roles and the
+            // docking:small capability are supported; large hulls can dock with other large hulls as well.
+            bool guestHasConflictingRoles = IsInternalDockClass(guest) && IsExternalDockClass(guest);
+            if (guestHasConflictingRoles) return false;
+            return CanHostDocking(guest) || CanDockInternally(guest, false);
         }
 
         /// <summary>
