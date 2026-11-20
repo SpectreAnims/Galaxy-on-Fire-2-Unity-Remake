@@ -95,7 +95,8 @@ namespace GoF2Remake.Modding
             || Matches(ship, ExternalDockClasses) || Matches(ship, new[] { LargeDockingCapability });
 
         /// <summary>A ship explicitly capable of hosting docked ships. This is independent of its display/class name.</summary>
-        public static bool CanHostDocking(ShipData host) => IsExternalDockClass(host) && !IsInternalDockClass(host);
+        public static bool CanHostDocking(ShipData host) => IsExternalDockClass(host) && !IsInternalDockClass(host)
+            && !Matches(host, new[] { SmallDockingCapability });
 
         /// <summary>Can the guest attach to the host? Large hulls can host both small and large guests; small hulls
         /// cannot host anything, so small-to-small docking is never allowed. Custom classes opt in with
