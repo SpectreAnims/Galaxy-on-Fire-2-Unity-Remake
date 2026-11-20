@@ -1,12 +1,12 @@
 // ShipClassCatalog.cs
-// The remake's canonical base ship classes. These definitions are available to engine systems and mods, but deliberately
-// do not assign a class to any original ship. A modder must opt a ship in through ships.json "shipClass".
+// Built-in ship-class identifiers are optional presets, not mandatory assignments. Original ships stay unclassified
+// unless a mod explicitly assigns a class through ships.json "shipClass". Custom namespaced ids are also valid.
 using System;
 using System.Collections.Generic;
 
 namespace GoF2Remake.Modding
 {
-    /// <summary>Default docking behaviour associated with a recognised base ship class.</summary>
+    /// <summary>Legacy docking hint for built-in class presets. New capabilities are declared independently via tags.</summary>
     public enum ShipDockingRole
     {
         SizeBased = 0,       // preserve legacy small-hull internal docking; no external docking permission
@@ -83,7 +83,7 @@ namespace GoF2Remake.Modding
             return index;
         }
 
-        /// <summary>All fourteen definitions, in their stable display/order sequence.</summary>
+        /// <summary>Built-in preset definitions, in their stable display/order sequence; none are assigned to stock ships.</summary>
         public static IReadOnlyList<ShipClassDefinition> All => definitions;
 
         public static ShipClassDefinition Get(string key)
