@@ -126,6 +126,40 @@ namespace GoF2Remake.Tests
         }
 
         [Test]
+        public void LargeHullsCanHostSmallAndLargeShipsButSmallHullsCannotHost()
+        {
+            var frigate = new ShipData { shipClass = "frigate" };
+            var freighter = new ShipData { shipClass = "freighter" };
+            var fighter = new ShipData { shipClass = "light_fighter" };
+            var customSmall = new ShipData { shipClass = "myfleet:gunship", classTags = new[] { "docking:small" } };
+            var customLarge = new ShipData { shipClass = "myfleet:dreadnought", classTags = new[] { "docking:large" } };
+
+            Assert.IsTrue(ShipClassRules.CanHostDocking(frigate));
+            Assert.IsTrue(ShipClassRules.CanHostDocking(freighter));
+            Assert.IsTrue(ShipClassRules.CanDockWithShip(fighter, frigate));
+            Assert.IsTrue(ShipClassRules.CanDockWithShip(customSmall, freighter));
+            Assert.IsTrue(ShipClassRules.CanDockWithShip(frigate, freighter));
+            Assert.IsTrue(ShipClassRules.CanDockWithShip(customLarge, frigate));
+            Assert.IsFalse(ShipClassRules.CanHostDocking(fighter));
+            Assert.IsFalse(ShipClassRules.CanDockWithShip(fighter, customSmall));
+            Assert.IsFalse(ShipClassRules.CanDockWithShip(customSmall, fighter));
+            Assert.IsFalse(ShipClassRules.CanDockWithShip(new ShipData(), frigate));
+            Assert.IsFalse(ShipClassRules.CanDockWithShip(frigate, new ShipData()));
+        }
+
+        [Test]
+        public void CustomDockingCapabilitiesAreIndependentOfCustomClassNames()
+        {
+            var small = new ShipData { shipClass = "myfleet:gunship", classTags = new[] { "docking:small" } };
+            var large = new ShipData { shipClass = "myfleet:carrier", classTags = new[] { "docking:large" } };
+
+            Assert.IsTrue(ShipClassRules.CanDockInternally(small, false));
+            Assert.IsFalse(ShipClassRules.CanDockExternally(small));
+            Assert.IsTrue(ShipClassRules.CanDockExternally(large));
+            Assert.IsTrue(ShipClassRules.CanHostDocking(large));
+        }
+
+        [Test]
         public void UnclassifiedSmallShipsKeepLegacyInternalDockingButCannotDockExternally()
         {
             var ship = new ShipData();
