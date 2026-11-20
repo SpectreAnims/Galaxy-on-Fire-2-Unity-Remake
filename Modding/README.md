@@ -915,8 +915,9 @@ unclassified. Class ids are case-insensitive for built-in presets; namespaced cu
 
 Classification describes what a ship is; docking capabilities describe what it can do. Use `classTags` to declare
 capabilities independently of the class name:
-- `docking:small`: the ship may dock as a guest, but cannot host other ships.
-- `docking:large`: the ship may host docking guests and may itself dock with other large ships.
+- `docking:small`: explicitly marks a small guest; it cannot host other ships.
+- `docking:large`: marks a large hull; it may host small or large guests and may itself dock with other large hulls.
+- A custom class with neither tag keeps the size-based small-hull default for station hangars and ship-docking guests; add `docking:large` when it should use the external route and host ships.
 - The built-in large-hull presets `frigate`, `freighter`, `cruiser` and `carrier` provide the large-hull capability.
 - The legacy role tags `fighter`, `interceptor`, `bomber`, `frigate`, `freighter`, `cruiser` and `carrier`
   remain recognised for compatibility with existing mods.
