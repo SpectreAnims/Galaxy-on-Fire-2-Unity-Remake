@@ -9,12 +9,13 @@
 //   items.json (a new item or an "override"):
 //       "allowedClasses":  ["frigate", "capital"]   only a ship whose class or tags name one of these may mount it
 //       "excludedClasses": ["small"]                a ship whose class or tags name one of these may not
-//   Docking role tags (ships.json "classTags"): "fighter", "interceptor" or "bomber" = internal hangar only;
-//       "frigate", "cruiser" or "carrier" = external station attachment only. Mod-specific class ids can keep their own
-//       names and include one of these shared role tags. External docking also requires a slotType 8 ship hardpoint and a
-//       station's manually authored orbit.externalDocks point. Stations may offer both routes: their normal hangar and
-//       externalDocks are independent. Unclassified small ships retain legacy internal docking; unclassified ships cannot
-//       use external docking. A ship with conflicting internal and external role tags is not dockable until corrected.
+//   Docking role tags (ships.json "classTags"): "fighter", "interceptor" or "bomber" = internal hangar; "frigate",
+//       "freighter", "cruiser" or "carrier" = external station attachment. Mod-specific class ids can keep their own names
+//       and declare "docking:small" or "docking:large" instead. External docking also requires a slotType 8 ship hardpoint
+//       and a station's manually authored orbit.externalDocks point. Stations may offer both routes independently.
+//       Ship-to-ship docking: frigates, freighters, cruisers and carriers may dock with one another and host smaller ships;
+//       smaller classified ships may dock with those large hosts, never with other small ships. Unclassified original ships
+//       keep legacy docking behaviour. A ship with conflicting internal and external role tags is not dockable until corrected.
 //       "className": "Light fighter"            optional display text for the class (a word or { "en": ..., "de": ... }, or the key
 //                                               "shipclass.<id>.name" in text/<lang>.json); without it the id is shown capitalised
 //   A ship without a class or tags is **unclassified** (every original ship unless a mod labels it): it takes every item, even
