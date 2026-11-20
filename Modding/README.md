@@ -904,15 +904,25 @@ styles](#exhaust-styles)), 4 manoeuvring jet (`"direction": [x, y, z]`, the way 
 | `classTags` | Optional shared tags for equipment matching, e.g. `["small", "mymod:agile"]`. |
 | `className` | Optional translated display label for the class scanner; class ids remain the machine identity. |
  
-The remake provides a built-in class registry (the classes exist in the engine, but **no original ship is assigned one by default**):
-`light_fighter`, `heavy_fighter`, `light_bomber`, `heavy_bomber`, `interceptor`, `stealth_bomber`, `hauler`,
-`light_privateer`, `privateer`, `heavy_privateer`, `frigate`, `freighter`, `cruiser`, and `carrier`.
-Use one of these ids in `shipClass`; ids are case-insensitive and stored in canonical lowercase. Custom ids remain supported.
-The fighter, bomber and interceptor classes default to internal hangar docking; frigate, cruiser and carrier default to
-external docking (which still requires a ship `slotType: 8` docking hardpoint and a station's authored exterior dock point).
-Hauler and privateer classes default to internal docking; freighters join frigates, cruisers and carriers in external-only docking.
-Custom classes can declare a docking role with `classTags`: `fighter`, `interceptor` or `bomber` for internal docking;
-`frigate`, `cruiser` or `carrier` for external docking. Conflicting role tags are rejected.
+The engine offers these built-in class-id presets: `light_fighter`, `heavy_fighter`, `light_bomber`,
+`heavy_bomber`, `interceptor`, `stealth_bomber`, `hauler`, `light_privateer`, `privateer`,
+`heavy_privateer`, `frigate`, `freighter`, `cruiser` and `carrier`. They are **not mandatory categories**:
+no original ship is assigned one automatically. Mods may use these ids, assign their own class ids, or leave a ship
+unclassified. Class ids are case-insensitive for built-in presets; namespaced custom ids such as
+`myfleet:gunship` are supported.
+
+Classification describes what a ship is; docking capabilities describe what it can do. Use `classTags` to declare
+capabilities independently of the class name:
+- `docking:small`: the ship may dock as a guest, but cannot host other ships.
+- `docking:large`: the ship may host docking guests and may itself dock with other large ships.
+- The built-in large-hull presets `frigate`, `freighter`, `cruiser` and `carrier` provide the large-hull capability.
+- The legacy role tags `fighter`, `interceptor`, `bomber`, `frigate`, `freighter`, `cruiser` and `carrier`
+  remain recognised for compatibility with existing mods.
+
+A large ship's exterior station docking still needs a ship `slotType: 8` docking hardpoint and a station's authored
+exterior dock point. Unclassified original ships are not assigned a new class or docking capability by this registry.
+Custom ship-to-ship docking also requires compatible host/guest capabilities: large hulls may host small or large
+guests; small hulls cannot host ships, and small-to-small docking is refused.
 | `wingmanDevice` | Optional. What a hired wingman flying this ship uses (Galaxy on Fire 3's wingmen): `"repair"` (Hull Repair: with your hull under 40 %, a quarter of it mended over 3 seconds), `"ammo"` (Ammo Supply: 5 more rounds of your selected secondary weapon when you are down to one or none) or `"charged"` (Charged Shots: its own shots do x1.75 for 5 seconds while it attacks); 55 seconds between uses. The HUD says when it does. None = nothing, like the game's wingmen. See [Wingmen](#wingmen). |
 | `integrated` | Optional, also in an `override`. Equipment built into the hull, like the Kothar ships' Khador Drive (Cronus, Typhon, Nemesis) and the Specter's / Scimitar's cloak: `{ "khadorDrive": true, "cloak": true }`. `khadorDrive`: the ship can make Khador jumps without the drive in a slot (it still needs energy cells). `cloak`: `true` (the U'tool's stats), a cloak item (a number or `"mod:id"`, e.g. `96`) whose stats it has, or `false`; a cloak the player mounts replaces it, and with the Gameplay option "Cloak bay on cloaking ships" it goes into the built-in cloak's bay instead of a slot. `false` takes an original ship's away. `items`: any equipment built in, a list of item numbers, `"mod:id"` keys or `{ "item": ..., "amount": n }` (a secondary weapon's starting ammo, default 10), e.g. `"items": [46, { "item": 36, "amount": 20 }, 54]`. Built-in items work like mounted ones but take no slot, show on the hangar's Ship tab under "Built into the ship", and can't be demounted, sold or stored; they stay with the ship type when the player changes ships. A one-per-ship item the player fits (a shield, armor, a booster, a scanner, a drill, a cloak...) takes the built-in one's place without a slot, and the built-in one is back when it is demounted; built-in weapons and turrets add to the ship's own slots. A built-in launcher's missiles are refilled by buying more; a one-off item that is used up (an emergency system) is back at the next docking. An empty list takes them away. |
 
