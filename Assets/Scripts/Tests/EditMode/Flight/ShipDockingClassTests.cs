@@ -143,8 +143,29 @@ namespace GoF2Remake.Tests
             Assert.IsFalse(ShipClassRules.CanHostDocking(fighter));
             Assert.IsFalse(ShipClassRules.CanDockWithShip(fighter, customSmall));
             Assert.IsFalse(ShipClassRules.CanDockWithShip(customSmall, fighter));
-            Assert.IsFalse(ShipClassRules.CanDockWithShip(new ShipData(), frigate));
-            Assert.IsFalse(ShipClassRules.CanDockWithShip(frigate, new ShipData()));
+            // Unclassified original ships retain the game's pre-existing docking behaviour.
+            Assert.IsTrue(ShipClassRules.CanDockWithShip(new ShipData(), frigate));
+            Assert.IsTrue(ShipClassRules.CanDockWithShip(frigate, new ShipData()));
+        }
+
+        [Test]
+        public void AllFourLargeBuiltInClassesCanDockWithEachOtherAndHostSmallCraft()
+        {
+            var largeClasses = new[] { "frigate", "freighter", "cruiser", "carrier" };
+            var small = new ShipData { shipClass = "scout" };
+
+            foreach (var hostClass in largeClasses)
+            {
+                var host = new ShipData { shipClass = hostClass };
+                Assert.IsTrue(ShipClassRules.CanHostDocking(host), hostClass + " should host ships");
+                Assert.IsTrue(ShipClassRules.CanDockWithShip(small, host), hostClass + " should host a small ship");
+                foreach (var guestClass in largeClasses)
+                {
+                    var guest = new ShipData { shipClass = guestClass };
+                    Assert.IsTrue(ShipClassRules.CanDockWithShip(guest, host),
+                        guestClass + " should be able to dock with " + hostClass);
+                }
+            }
         }
 
         [Test]
