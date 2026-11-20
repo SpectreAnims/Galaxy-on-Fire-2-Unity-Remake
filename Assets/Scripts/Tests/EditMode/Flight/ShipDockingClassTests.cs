@@ -152,14 +152,23 @@ namespace GoF2Remake.Tests
         public void AllFourLargeBuiltInClassesCanDockWithEachOtherAndHostSmallCraft()
         {
             var largeClasses = new[] { "frigate", "freighter", "cruiser", "carrier" };
-            var small = new ShipData { shipClass = "scout" };
+            var smallClasses = new[]
+            {
+                "light_fighter", "heavy_fighter", "light_bomber", "heavy_bomber", "interceptor",
+                "stealth_bomber", "hauler", "light_privateer", "privateer", "heavy_privateer"
+            };
 
             foreach (var hostClass in largeClasses)
             {
                 var host = new ShipData { shipClass = hostClass };
                 Assert.IsTrue(ShipClassRules.CanHostDocking(host), hostClass + " should host ships");
-                Assert.IsTrue(ShipClassRules.CanDockWithShip(small, host), hostClass + " should host a small ship");
                 foreach (var guestClass in largeClasses)
+                {
+                    var guest = new ShipData { shipClass = guestClass };
+                    Assert.IsTrue(ShipClassRules.CanDockWithShip(guest, host),
+                        guestClass + " should be able to dock with " + hostClass);
+                }
+                foreach (var guestClass in smallClasses)
                 {
                     var guest = new ShipData { shipClass = guestClass };
                     Assert.IsTrue(ShipClassRules.CanDockWithShip(guest, host),
