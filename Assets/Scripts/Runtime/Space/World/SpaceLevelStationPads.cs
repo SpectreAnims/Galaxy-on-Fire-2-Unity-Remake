@@ -134,7 +134,7 @@ namespace GoF2Remake.World
             }
             if (!ExternalDockEligible || !FindExternalDockingPair(externalDockPoints[pointIndex], out _, out var mount))
             {
-                Debug.LogError("Mod Builder: the selected ship needs a frigate, cruiser or carrier class and at least one external docking hardpoint.");
+                Debug.LogError("Mod Builder: the selected ship needs a frigate, freighter, cruiser or carrier class and at least one external docking hardpoint.");
                 Modding.ModBuilder.EndPlayTest();
                 return;
             }
