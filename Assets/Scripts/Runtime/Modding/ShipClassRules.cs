@@ -81,13 +81,31 @@ namespace GoF2Remake.Modding
         // Docking roles use the same class ids / tags as equipment restrictions. The class ids are intentionally
         // free-form; these conventional role tags let modders keep their own class names while declaring the docking role.
         static readonly string[] InternalDockClasses = { "fighter", "interceptor", "bomber" };
-        static readonly string[] ExternalDockClasses = { "frigate", "cruiser", "carrier" };
+        static readonly string[] ExternalDockClasses = { "frigate", "freighter", "cruiser", "carrier" };
+        // Capability tags let a custom class declare behaviour without borrowing a stock class name.
+        const string SmallDockingCapability = "docking:small";
+        const string LargeDockingCapability = "docking:large";
 
         public static bool IsInternalDockClass(ShipData ship) =>
             ShipClassCatalog.DockingRoleOf(ship?.shipClass) == ShipDockingRole.InternalOnly || Matches(ship, InternalDockClasses);
 
         public static bool IsExternalDockClass(ShipData ship) =>
-            ShipClassCatalog.DockingRoleOf(ship?.shipClass) == ShipDockingRole.ExternalOnly || Matches(ship, ExternalDockClasses);
+            ShipClassCatalog.DockingRoleOf(ship?.shipClass) == ShipDockingRole.ExternalOnly
+            || Matches(ship, ExternalDockClasses) || Matches(ship, new[] { LargeDockingCapability });
+
+        /// <summary>A ship explicitly capable of hosting docked ships. This is independent of its display/class name.</summary>
+        public static bool CanHostDocking(ShipData host) => IsExternalDockClass(host) && !IsInternalDockClass(host);
+
+        /// <summary>Can the guest attach to the host? Large hulls can host both small and large guests; small hulls
+        /// cannot host anything, so small-to-small docking is never allowed. Custom classes opt in with
+        /// classTags [\"docking:small\"] or [\"docking:large\"].</summary>
+        public static bool CanDockWithShip(ShipData guest, ShipData host)
+        {
+            if (guest == null || host == null || !CanHostDocking(host)) return false;
+            bool guestLarge = CanHostDocking(guest);
+            bool guestSmall = IsInternalDockClass(guest) || Matches(guest, new[] { SmallDockingCapability });
+            return guestLarge || guestSmall;
+        }
 
         /// <summary>
         /// Internal hangars accept fighter / interceptor / bomber classes. For backward compatibility, an otherwise
@@ -102,8 +120,8 @@ namespace GoF2Remake.Modding
             return !largeHull;
         }
 
-        /// <summary>External docking is reserved for frigate / cruiser / carrier roles; an unclassified ship cannot use it.</summary>
-        public static bool CanDockExternally(ShipData ship) => IsExternalDockClass(ship) && !IsInternalDockClass(ship);
+        /// <summary>External docking is available to ships with the large-hull capability; unclassified ships cannot use it.</summary>
+        public static bool CanDockExternally(ShipData ship) => CanHostDocking(ship);
 
         /// <summary>The ship's class id (the machine identity), null for a ship without one (tags alone are not a class).</summary>
         public static string ClassOf(ShipData ship) => string.IsNullOrEmpty(ship?.shipClass) ? null : ship.shipClass;
