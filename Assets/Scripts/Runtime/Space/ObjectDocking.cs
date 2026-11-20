@@ -128,6 +128,8 @@ namespace GoF2Remake.Flight
             {
                 string refusal = CapitalShips.DockRefusal(target);
                 if (refusal != null) { Say(refusal); return false; }
+                refusal = ClassDockRefusal(target);
+                if (refusal != null) { Say(refusal); return false; }
             }
             if (Refusal?.Invoke(target) is string levelRefusal) { Say(levelRefusal); return false; }
             var points = SpacePoints.Set(target.SpacePointSet);
@@ -142,6 +144,23 @@ namespace GoF2Remake.Flight
             Say(Localization.Get(3199));   // 0x22
             Play(sounds?.autopilotOn);
             return true;
+        }
+
+        /// <summary>Remake mods: enforce the class/capability relationship for ship resupply decks. Unclassified ships keep
+        /// their original behaviour; a classified host must be a large hull, and a classified guest must be a small or large hull.
+        /// Large hulls can dock with each other; small hulls can dock only with large hulls.</summary>
+        string ClassDockRefusal(NpcShip target)
+        {
+            if (db == null || target == null || Modding.ModBuilder.TestNpcShip != null || target.Target == null) return null;
+            var guest = db.Ship(Session.ShipIndex);
+            var host = db.Ship(target.Target.shipType);
+            if (guest == null || host == null) return null; // preserve legacy behaviour when a docking target has no ship record
+            if (Modding.ShipClassRules.CanDockWithShip(guest, host)) return null;
+
+            string hostName = CapitalShips.HostName(target);
+            if (Modding.ShipClassRules.IsClassified(host) && !Modding.ShipClassRules.CanHostDocking(host))
+                return string.Format(Localization.Extra("classNoHost", "{0} can't be docked with."), hostName);
+            return Localization.Extra("classDockRefused", "This ship cannot dock with that ship.");
         }
 
         /// <summary>The action while approaching (autopilot off) or docked (PlayerEgo::dockToDockingPoint again: undock).</summary>
