@@ -374,9 +374,9 @@ namespace GoF2Remake.Data
             // Status::departStation: at the owned club the storage is the station's stock (one shared list here).
             if (KaamoClub.StorageAt(station)) stock.items = Session.KaamoItems;
             Freelance.OnEnterStation(stock);
-            // Previously cached stocks respect newly enabled item restrictions.
-            stock.items?.RemoveAll(row => !Modding.ModContent.ItemAvailableFor(row.item, "shops"));
             GameHooks.StockEntered?.Invoke(stock);   // multiplayer: the stock everyone shares replaces it
+            // Filter after shared stock substitution too, not only locally generated stock.
+            stock.items?.RemoveAll(row => !Modding.ModContent.ItemAvailableFor(row.item, "shops"));
             return stock;
         }
 
