@@ -942,7 +942,9 @@ namespace GoF2Remake.World
         /// <summary>Optional nonlethal misjump consequences; cargo and ship ownership are unchanged.</summary>
         void ApplyFailureConsequences(GoF2Remake.Modding.ModJumpFx.Spec d)
         {
-            if (d == null || !d.hasJumpRules || health == null || health.Target == null) return;
+            if (d == null || !d.hasJumpRules) return;
+            if (health == null && ship != null) health = ship.GetComponent<PlayerHealth>();
+            if (health == null || health.Target == null) return;
             if (d.failEquipmentLossChance > 0f && UnityEngine.Random.value < d.failEquipmentLossChance)
             {
                 var eligible = new System.Collections.Generic.List<int>();
