@@ -368,7 +368,7 @@ namespace GoF2Remake.Data
                 do it = db.Items[R(db.Items.Count)];
                 while ((NotForSale.Contains(it.index) || it.blueprint.Count > 0 || SinglePrice(it) == 0 || it.occurrence == 0
                         || !Modding.ModCampaigns.ItemAllowed(db, it.index) || !Modding.ModUnlocks.ItemAvailable(it.index)
-                        || Shop.NotInSession(db, it.index)) && ++tries < 5000);
+                        || !Modding.ModContent.ItemAvailableFor(it.index, "shops") || Shop.NotInSession(db, it.index)) && ++tries < 5000);
                 // remake mods: a campaign's own items, and a mod item only once its "available" condition holds
                 a.sellItem = it.index;
                 a.sellQuantity = it.TypeId <= 3 && it.TypeId != 1 ? 1 : R(15) + 5;   // primary, turret, equipment: 1
