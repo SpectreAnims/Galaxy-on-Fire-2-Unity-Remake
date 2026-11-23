@@ -951,7 +951,7 @@ namespace GoF2Remake.World
                     int installed = Session.Equipment[i].item;
                     // Never select a mounted weapon, ammunition, cargo or ship component.
                     var itemData = db.Item(installed);
-                    if (itemData != null && itemData.TypeId == 3 &&
+                    if (itemData != null && itemData.TypeId == 3 && !Session.Equipment[i].builtIn &&
                         (d.failEquipmentIncludesDrive || installed != d.item))
                         eligible.Add(i);
                 }
