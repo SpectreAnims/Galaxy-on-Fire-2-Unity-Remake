@@ -179,7 +179,8 @@ namespace GoF2Remake.Data
             int systemRace = Sys(db, SystemOf(db, station))?.raceId ?? -1;
             foreach (var (product, at) in StoryBlueprints)
             {
-                if (at != station || Blueprints.IsUnlocked(product) || db.Item(product) == null) continue;
+                if (at != station || Blueprints.IsUnlocked(product) || db.Item(product) == null
+                    || !Modding.ModContent.ItemAvailableFor(product, "blueprints")) continue;
                 if (agents.Exists(a => a.offer == AgentOffer.SellBlueprint && a.sellBlueprint == product)) continue;
                 int race = systemRace >= 0 && systemRace <= 3 ? systemRace : 0;
                 bool male = race == 0 ? R(100) < 60 : true;
