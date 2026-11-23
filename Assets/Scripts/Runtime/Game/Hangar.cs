@@ -550,6 +550,7 @@ namespace GoF2Remake.Data
             swapWith = -1;
             var it = db.Item(item);
             if (it == null || CargoOf(item) <= 0) return Result.NothingToSell;
+            if (!Modding.ModContent.ItemAvailableFor(item, "equipment")) return Result.NotMountable;
             int type = it.TypeId;
             if (type > 3) return Result.NotMountable;
             // Remake mods (Modding.ShipClassRules): an item restricted to some ship classes (items.json allowedClasses /
