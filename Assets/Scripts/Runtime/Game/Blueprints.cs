@@ -51,7 +51,8 @@ namespace GoF2Remake.Data
         static readonly HashSet<int> NeedsRoutes = new HashSet<int> { 210, 223 };
 
         /// <summary>Every product (items with ingredients) in item-index order (Status::resetGame).</summary>
-        public static List<ItemData> Products(Database db) => db.Items.FindAll(i => i.blueprint != null && i.blueprint.Count > 0);
+        public static List<ItemData> Products(Database db) => db.Items.FindAll(i => i.blueprint != null && i.blueprint.Count > 0
+            && Modding.ModContent.ItemAvailableFor(i.index, "blueprints"));
 
         public static bool IsUnlocked(int product) => Session.UnlockedBlueprints.Contains(product);
         public static void Unlock(int product) => Session.UnlockedBlueprints.Add(product);
