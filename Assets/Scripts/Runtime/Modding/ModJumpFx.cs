@@ -92,6 +92,24 @@ namespace GoF2Remake.Modding
             public List<Part> parts;
         }
 
+        /// <summary>Pure, nonlethal damage calculation. A hull already at/below its floor is unchanged.</summary>
+        public static int HullAfterFailure(int current, int maximum, float damageFraction, float minimumFraction)
+        {
+            if (maximum <= 0) return current;
+            int floor = Mathf.CeilToInt(maximum * Mathf.Clamp01(minimumFraction));
+            if (current <= floor) return current;
+            int damage = Mathf.RoundToInt(maximum * Mathf.Clamp01(damageFraction));
+            return Mathf.Max(floor, current - damage);
+        }
+
+        /// <summary>Route-aware risk for the opt-in framework and legacy jumpFx drives.</summary>
+        public static float FailureProbability(Spec drive, int gateSegments, bool connected, bool extreme)
+        {
+            if (drive == null) return 0f;
+            if (!connected) return drive.failNoRoute;
+            return Mathf.Min(drive.failMax, drive.failChance * Mathf.Max(0, gateSegments) * (extreme ? 2 : 1));
+        }
+
         static readonly Dictionary<int, Spec> cache = new Dictionary<int, Spec>();
         static int revision = -1;
 
