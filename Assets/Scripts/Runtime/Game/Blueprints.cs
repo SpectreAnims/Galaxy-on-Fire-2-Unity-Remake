@@ -263,7 +263,7 @@ namespace GoF2Remake.Data
         public static bool Produce(Database db, int product, int currentStation)
         {
             var it = db.Item(product);
-            if (it == null || it.blueprint == null) return false;   // not a product (-1 from a stale hangar row)
+            if (it == null || it.blueprint == null || !Modding.ModContent.ItemAvailableFor(product, "blueprints")) return false;   // unavailable or stale product
             var s = State(db, product);
             int qty = BaseQuantity(it);
             if (s.station < 0) s.station = currentStation;
