@@ -945,7 +945,14 @@ namespace GoF2Remake.World
             {
                 var eligible = new System.Collections.Generic.List<int>();
                 for (int i = 0; i < Session.Equipment.Count; i++)
-                    if (d.failEquipmentIncludesDrive || Session.Equipment[i].item != d.item) eligible.Add(i);
+                {
+                    int installed = Session.Equipment[i].item;
+                    // Never select a mounted weapon, ammunition, cargo or ship component.
+                    var itemData = db.Item(installed);
+                    if (itemData != null && itemData.TypeId == 3 &&
+                        (d.failEquipmentIncludesDrive || installed != d.item))
+                        eligible.Add(i);
+                }
                 if (eligible.Count > 0)
                 {
                     int slot = eligible[UnityEngine.Random.Range(0, eligible.Count)];
