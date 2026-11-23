@@ -326,7 +326,8 @@ namespace GoF2Remake.Data
         }
 
         /// <summary>Ship::hasJumpDriveIntegrated (37 / 38 / 40, and a mod ship's "integrated": "khadorDrive").</summary>
-        public static bool HasIntegratedDrive(int ship) => Database.Shared.HasIntegratedDrive(ship);
+        public static bool HasIntegratedDrive(int ship) =>
+            Modding.ModContent.ItemAvailableFor(KhadorDriveItem, "equipment") && Database.Shared.HasIntegratedDrive(ship);
 
         /// <summary>Modified: jumps take no energy cells: the Debug panel's free jumps, or a mounted mod drive whose "jumpFx" has
         /// "freeJumps": true (Modding.ModJumpFx).</summary>
