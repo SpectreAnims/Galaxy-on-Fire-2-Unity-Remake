@@ -336,6 +336,7 @@ namespace GoF2Remake.Data
         /// own jump effect and rules); not a cruise drive, which is based on it too (Shop.IsCruiseDrive).</summary>
         public static bool IsKhadorDrive(int item)
         {
+            if (!GoF2Remake.Modding.ModContent.ItemAvailableFor(item, "equipment")) return false;
             if (item == KhadorDriveItem) return true;
             var it = item >= 0 ? Database.Shared.Item(item) : null;
             return it != null && it.Look == KhadorDriveItem && !Shop.IsCruiseDrive(it);
