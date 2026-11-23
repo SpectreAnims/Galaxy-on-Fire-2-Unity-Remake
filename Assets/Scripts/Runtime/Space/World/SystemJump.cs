@@ -884,11 +884,13 @@ namespace GoF2Remake.World
             if (d != null && failElapsed < d.failMs) return;
             if (failEngine != null) { failEngine.Stop(); Destroy(failEngine); failEngine = null; }   // IntroCutscenes: StopLoop(1) at the jump
             ship.impairment = 1f;
-            int target = FailTarget();
-            // Apply once, before the scene is unloaded: avoids duplicate arrival penalties.
-            ApplyFailureConsequences(d);
+            // A gate may have become unavailable during the failure sequence.
+            // If no safe escape destination remains, complete the intended jump without penalties.
+            bool hasEscape = d == null || !d.requireConnectedFailureDestination || FailCandidates(true).Count > 0;
+            int target = hasEscape ? FailTarget() : Session.ProgrammedStation;
+            if (hasEscape) ApplyFailureConsequences(d);   // once, before unloading the scene
             Session.ProgrammedStation = target;
-            jumpFailed = true;
+            jumpFailed = hasEscape;
             StartKhadorScene();
         }
 
