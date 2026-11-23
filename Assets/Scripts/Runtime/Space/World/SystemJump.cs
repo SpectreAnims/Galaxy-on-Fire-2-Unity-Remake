@@ -919,7 +919,9 @@ namespace GoF2Remake.World
                     foreach (int neighbourId in system.jumpRoutesTo)
                     {
                         var neighbour = db.Systems.Find(s => s.index == neighbourId);
-                        if (neighbour != null && neighbour.jumpRoutesTo != null && neighbour.jumpRoutesTo.Contains(system.index))
+                        if (neighbour != null && neighbour.jumpRoutesTo != null && neighbour.jumpRoutesTo.Contains(system.index)
+                            && (GameHooks.JumpgateLinkOperational?.Invoke(system.index, neighbourId) ?? true)
+                            && (GameHooks.JumpgateLinkOperational?.Invoke(neighbourId, system.index) ?? true))
                         { connected = true; break; }
                     }
                     if (!connected) continue;
