@@ -462,6 +462,7 @@ namespace GoF2Remake.Data
                 do it = db.Items[97 + R(db.Items.Count - 97)];
                 while (it.occurrence == 0 || SinglePrice(it) == 0 || NotForPurchase.Contains(it.index) || it.blueprint.Count > 0
                        || !Modding.ModUnlocks.ItemAvailable(it.index)    // remake mods: not a mod item no shop may stock yet
+                       || !Modding.ModContent.ItemAvailableFor(it.index, "shops")
                        || Shop.NotInSession(db, it.index));             // remake: nor the time extender in multiplayer
                 m.good = it.index;
                 m.amount = R(15) + 5;
