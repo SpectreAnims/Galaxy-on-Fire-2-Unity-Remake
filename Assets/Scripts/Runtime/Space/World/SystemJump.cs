@@ -810,8 +810,8 @@ namespace GoF2Remake.World
             var b = db.Systems.Find(s => s.index == to);
             var path = a != null && b != null && a.jumpRoutesTo.Count > 0 && b.jumpRoutesTo.Count > 0
                 ? GalaxyMap.SystemPath(db, from, to) : null;
-            if (path == null) return d.failNoRoute;
-            return Mathf.Min(d.failMax, d.failChance * Mathf.Max(0, path.Count - 1) * (Session.IsExtreme ? 2 : 1));
+            return GoF2Remake.Modding.ModJumpFx.FailureProbability(d, path != null ? path.Count - 1 : 0,
+                path != null, Session.IsExtreme);
         }
 
         bool RollFailure()
@@ -959,8 +959,8 @@ namespace GoF2Remake.World
             int minimum = Mathf.CeilToInt(hp.maxHull * d.failMinimumHull);
             if (hp.maxHull > 0 && hp.hull > minimum && d.failHullDamage > 0f)
             {
-                int damage = Mathf.RoundToInt(hp.maxHull * d.failHullDamage);
-                hp.hull = Mathf.Max(minimum, hp.hull - damage);
+                hp.hull = GoF2Remake.Modding.ModJumpFx.HullAfterFailure(
+                    hp.hull, hp.maxHull, d.failHullDamage, d.failMinimumHull);
                 health.Target.hp = hp.hull;
                 Session.PlayerHull = hp.hull;
                 Message?.Invoke($"Misjump hull: {Mathf.RoundToInt(100f * hp.hull / hp.maxHull)}%");
