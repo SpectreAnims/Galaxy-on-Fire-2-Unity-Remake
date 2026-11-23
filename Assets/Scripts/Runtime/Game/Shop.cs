@@ -376,7 +376,8 @@ namespace GoF2Remake.Data
             Freelance.OnEnterStation(stock);
             GameHooks.StockEntered?.Invoke(stock);   // multiplayer: the stock everyone shares replaces it
             // Filter after shared stock substitution too, not only locally generated stock.
-            stock.items?.RemoveAll(row => !Modding.ModContent.ItemAvailableFor(row.item, "shops"));
+            if (!KaamoClub.StorageAt(station))  // the club's inventory is the player's own storage, not shop stock
+                stock.items?.RemoveAll(row => !Modding.ModContent.ItemAvailableFor(row.item, "shops"));
             return stock;
         }
 
