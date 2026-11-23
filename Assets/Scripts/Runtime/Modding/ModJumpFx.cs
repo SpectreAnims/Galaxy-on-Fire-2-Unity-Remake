@@ -131,7 +131,7 @@ namespace GoF2Remake.Modding
         /// with the drive built in is aboard (then null: the Khador Drive's rules and effect).</summary>
         public static Spec ActiveDrive()
         {
-            if (GalaxyMap.HasIntegratedDrive(Session.ShipIndex) || Session.Equipment.Exists(e => e.item == GalaxyMap.KhadorDriveItem)) return null;
+            if (GalaxyMap.HasIntegratedDrive(Session.ShipIndex) || Session.Equipment.Exists(e => e.item == GalaxyMap.KhadorDriveItem && ModContent.ItemAvailableFor(e.item, "equipment"))) return null;
             return Mounted();
         }
 
