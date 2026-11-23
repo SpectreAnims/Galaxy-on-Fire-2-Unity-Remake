@@ -650,7 +650,7 @@ namespace GoF2Remake.World
             // Modified: a mounted drive's own jump effect (Modding.ModJumpFx), set so the ship, flying on at BaseSpeed, reaches
             // its meeting point at meetMs; the camera stays the Khador Drive's (around fxPos). Not into interstellar space,
             // which has its own hole.
-            var modSpec = toInterstellar ? null : GoF2Remake.Modding.ModJumpFx.ActiveDrive();
+            var modSpec = toInterstellar ? null : jumpFailed && failDrive != null ? failDrive : GoF2Remake.Modding.ModJumpFx.ActiveDrive();
             khadorHideMs = 1700f;
             khadorModFx = false;
             if (rift == null && modSpec != null)
