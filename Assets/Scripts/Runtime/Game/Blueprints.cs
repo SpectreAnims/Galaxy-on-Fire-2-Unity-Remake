@@ -55,6 +55,9 @@ namespace GoF2Remake.Data
             && Modding.ModContent.ItemAvailableFor(i.index, "blueprints"));
 
         public static bool IsUnlocked(int product) => Session.UnlockedBlueprints.Contains(product);
+
+        /// <summary>A mod may bar ordinary blueprint acquisition and production in multiplayer; scripted unlocks remain intact.</summary>
+        public static bool IsRestricted(int product) => Modding.ModContent.IsBlueprintRestricted(product);
         public static void Unlock(int product) => Session.UnlockedBlueprints.Add(product);
 
         /// <summary>BluePrint+0x20: 10 per run for secondaries, else 1.</summary>
@@ -169,7 +172,7 @@ namespace GoF2Remake.Data
         /// ADD), which Withdraw may give back; the story's pre-investments (UnlockFromStory) are not.</summary>
         public static void Invest(Database db, int product, int ingredient, int units, int station, bool byPlayer = false)
         {
-            if (units <= 0) return;
+            if (units <= 0 || byPlayer && IsRestricted(product)) return;
             // A dry-dock-restricted ship blueprint cannot be progressed through an ordinary station's hangar.
             if (Modding.ModBlueprints.RequiresDryDock(product, db) && GameHooks.HasDryDockAtStation?.Invoke(station) != true) return;
             var s = State(db, product);
@@ -269,7 +272,7 @@ namespace GoF2Remake.Data
             // Keep the final production path authoritative too; the UI's CanStartIn check is not a security boundary.
             if (Modding.ModBlueprints.RequiresDryDock(product, db) && GameHooks.HasDryDockAtStation?.Invoke(currentStation) != true) return false;
             var it = db.Item(product);
-            if (it == null || it.blueprint == null || !Modding.ModContent.ItemAvailableFor(product, "blueprints")) return false;   // unavailable or stale product
+            if (it == null || it.blueprint == null || IsRestricted(product) || !Modding.ModContent.ItemAvailableFor(product, "blueprints")) return false;   // unavailable or stale product
             var s = State(db, product);
             int qty = BaseQuantity(it);
             if (s.station < 0) s.station = currentStation;
