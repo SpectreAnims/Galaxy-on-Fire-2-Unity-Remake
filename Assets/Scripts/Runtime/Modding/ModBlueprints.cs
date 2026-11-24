@@ -317,7 +317,7 @@ namespace GoF2Remake.Modding
 
         /// <summary>Its "available" condition holds in this game.</summary>
         public static bool Available(Def d) =>
-            ModContent.ItemAvailableFor(d.product, "blueprints") &&
+            ModContent.ItemAvailableFor(d.product, "blueprints") && !ModContent.IsBlueprintRestricted(d.product) &&
             !Shop.SlipstreamOff(d.product) && ModUnlocks.Holds(d.mod, d.available, d.where);
 
         /// <summary>Blueprints.AutoCompletePrice: a mod's own price (or none: false).</summary>
