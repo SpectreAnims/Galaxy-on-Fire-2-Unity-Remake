@@ -230,6 +230,7 @@ namespace GoF2Remake.Data
         /// <summary>210 / 223 can't be started in a system without gate routes (528).</summary>
         public static bool CanStartIn(Database db, int product, int station)
         {
+            if (IsRestricted(product) || !Modding.ModContent.ItemAvailableFor(product, "blueprints")) return false;
             if (Modding.ModBlueprints.RequiresDryDock(product, db) && GameHooks.HasDryDockAtStation?.Invoke(station) != true) return false;
             if (!NeedsRoutes.Contains(product)) return true;
             int sys = db.Stations.Find(x => x.index == station)?.system ?? -1;
@@ -262,7 +263,7 @@ namespace GoF2Remake.Data
         }
 
         /// <summary>Remake mods: the blueprint may be autocompleted (blueprints.json "autocomplete": false: never).</summary>
-        public static bool CanAutocomplete(int product) => Settings.BlueprintAutocomplete
+        public static bool CanAutocomplete(int product) => !IsRestricted(product) && Modding.ModContent.ItemAvailableFor(product, "blueprints") && Settings.BlueprintAutocomplete
             && (!Modding.ModBlueprints.AutocompleteOverride(product, out bool allowed, out _) || allowed);
 
         /// <summary>A completed run: to the hold here (true) or waiting at the production station (false); then reset.
