@@ -163,6 +163,7 @@ namespace GoF2Remake.Multiplayer
         public Vector3 ShownVelocity => smoothing.Velocity;
         public float HullFraction => St.HullFraction;
         public NetProxyStatus Status => St;
+        internal bool ScanVisible => (hasPose || (IsOwner && ship != null)) && IsFlying && !IsJunk && St.radius > 0f && St.cloak < 25 && !St.Has(NetProxyStatus.Hidden) && !St.Has(NetProxyStatus.Asleep) && !St.Has(NetProxyStatus.Inactive);
         /// <summary>The ship this game runs for it (null = another game's, or none).</summary>
         public NpcShip BoundShip => IsOwner ? ship : null;
         /// <summary>Remake (Settings.DerelictWrecks): another game's derelict freighter nobody has hacked yet: this player
