@@ -423,7 +423,7 @@ namespace GoF2Remake.Flight
                     gun.damage = (int)(gun.damage * damageFactor);
                     gun.reloadMs = Mathf.Max(1f, (int)(gun.reloadMs * fireRate));
                 }
-                if (gun.isBeam) gun.AutoAim = BeamTarget;
+                if (gun.isBeam) gun.AutoAim = () => BeamTarget(gun);
                 if (gun.beamRadius > 0f) gun.BeamSweeps = t => t.isShip ? t.hostileToPlayer || t == LockTarget : !t.friendToPlayer;   // remake mods: a wide beam
                 if (gun.heatShots > 0)   // remake mods: a gun that overheats (heatShots)
                     gun.OverheatStarted += g => Message?.Invoke(string.Format(Localization.Extra("weaponOverheated", "{0} overheated"),
@@ -750,7 +750,7 @@ namespace GoF2Remake.Flight
         /// Remake (#100), with the Smart target lock (Settings.OriginalTargetLock off, the default): a friendly or neutral ship
         /// only when it is the radar's lock (LockTarget); the beam snapped onto the nearest ship whatever its side, and a
         /// friendly flying between the player and the enemy took the shots and turned its race.</summary>
-        Target BeamTarget()
+        Target BeamTarget(Gun gun)
         {
             bool smart = !Settings.OriginalTargetLock;
             var cam = Camera.main;
@@ -758,14 +758,19 @@ namespace GoF2Remake.Flight
             var aim = cam.WorldToScreenPoint(ChaseCamera.AimOrigin(transform) + transform.forward * 22000f * M);
             float box = Screen.width / 16f, best = float.MaxValue;
             Target found = null;
+            var muzzle = gun.BeamMuzzle(transform.position, transform.rotation);
             foreach (var t in Target.All)
             {
                 if (t == null || t == owner || !t.Alive || t.untargetable || !t.isActiveAndEnabled || t.playerProof) continue;   // multiplayer: squadmates
                 if (t.isAsteroid) continue;   // the remake's beams took a rock near the crosshair while fighting
                 if (smart && t.isShip && !t.hostileToPlayer && t != LockTarget) continue;
                 var d = t.transform.position - transform.position;
-                if (t.isShip ? d.magnitude >= BeamRangeUnits * M
-                             : Mathf.Abs(d.x) >= BeamObjectCubeUnits * M || Mathf.Abs(d.y) >= BeamObjectCubeUnits * M || Mathf.Abs(d.z) >= BeamObjectCubeUnits * M) continue;
+                if (gun.hasCustomBeamReach)
+                {
+                    if (!gun.BeamCanReach(muzzle, t.transform.position)) continue;
+                }
+                else if (t.isShip ? d.magnitude >= BeamRangeUnits * M
+                                  : Mathf.Abs(d.x) >= BeamObjectCubeUnits * M || Mathf.Abs(d.y) >= BeamObjectCubeUnits * M || Mathf.Abs(d.z) >= BeamObjectCubeUnits * M) continue;
                 var p = cam.WorldToScreenPoint(t.transform.position);
                 if (p.z <= 0f || Mathf.Abs(p.x - aim.x) >= box || Mathf.Abs(p.y - aim.y) >= box) continue;
                 float dist = d.sqrMagnitude;

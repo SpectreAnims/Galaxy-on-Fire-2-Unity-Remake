@@ -85,6 +85,49 @@ namespace GoF2Remake.Tests
         }
 
         [Test]
+        public void NarrowBeamRangeIsIndependentOfLifetimeAndReload()
+        {
+            var gun = new Gun(Item(11, 0, 9, 71, 11, 1500, 12, 1500, Gun.BeamReachAttr, 280000), Vector3.zero, false);
+            Assert.IsTrue(gun.hasCustomBeamReach);
+            Assert.AreEqual(0f, gun.beamRadius);
+            Assert.AreEqual(1500f, gun.lifetimeMs);
+            Assert.IsTrue(gun.BeamCanReach(Vector3.zero, Vector3.forward * 14000f));
+            Assert.IsFalse(gun.BeamCanReach(Vector3.zero, Vector3.forward * 14001f));
+            var beyond = At(new Vector3(100f, 0f, 15000f), "beyond range");
+            gun.AutoAim = () => beyond;
+            Assert.AreEqual(0, gun.TryFire(Vector3.zero, Quaternion.identity, false));
+            Assert.IsNull(gun.BeamTarget);
+            Assert.AreEqual(280000f, gun.BeamLengthUnits);
+            gun.Update(1501f, new List<Target> { beyond }, null);
+            Assert.IsTrue(gun.Ready, "a complete miss does not outlast its configured reload");
+            var target = At(new Vector3(100f, 0f, 12000f), "inside range");
+            gun.AutoAim = () => target;
+            int hits = 0;
+            gun.Hit += (_, t, __) => { if (t == target) hits++; };
+            Assert.AreEqual(0, gun.TryFire(Vector3.zero, Quaternion.identity, false));
+            Assert.AreEqual(target.transform, gun.BeamTarget);
+            gun.Update(16f, new List<Target> { target }, null);
+            Assert.AreEqual(1, hits);
+        }
+
+        [Test]
+        public void ConfiguredNarrowBeamSweepsItsFullRayWithoutAutoAim()
+        {
+            var gun = new Gun(Item(11, 0, 9, 71, 11, 1500, 12, 1500, Gun.BeamReachAttr, 280000), Vector3.zero, false);
+            var inside = At(Vector3.forward * 12000f, "inside");
+            var beyond = At(Vector3.forward * 15000f, "beyond");
+            int insideHits = 0, beyondHits = 0;
+            gun.Hit += (_, t, __) => { if (t == inside) insideHits++; if (t == beyond) beyondHits++; };
+            Assert.AreEqual(0, gun.TryFire(Vector3.zero, Quaternion.identity, false));
+            gun.Update(16f, new List<Target> { beyond, inside }, null);
+            Assert.AreEqual(1, insideHits);
+            Assert.AreEqual(0, beyondHits);
+            var legacy = new Gun(Item(11, 0, 11, 1500, 12, 2600), Vector3.zero, false);
+            Assert.IsFalse(legacy.hasCustomBeamReach);
+            Assert.AreEqual(Gun.BeamRangeUnits, legacy.beamReach);
+        }
+
+        [Test]
         public void AGunOverheatsWaitsAndCools()
         {
             var gun = new Gun(Item(0, 1, 9, 10, 11, 50, Gun.HeatShotsAttr, 3, Gun.HeatCoolMsAttr, 3000, Gun.OverheatMsAttr, 1000),

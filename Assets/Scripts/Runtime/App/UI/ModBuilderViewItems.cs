@@ -208,7 +208,9 @@ namespace GoF2Remake.UI
                 shown++;
             }
             if (shown == 0) Note(itemPage, T("mbNoStats", "This kind of item has no stats to change."));
-            else Note(itemPage, T("mbStatsNote", "Times in ms, speeds in game units per ms (20 = 1 m); range = speed x lifetime."));
+            else Note(itemPage, Flight.Gun.IsBeamLook(original.Look)
+                ? T("mbBeamStatsNote", "Times in ms; beamReach sets range independently of lifetime (20 game units = 1 m).")
+                : T("mbStatsNote", "Times in ms, speeds in game units per ms (20 = 1 m); range = speed x lifetime."));
 
             BuildExtraStats(it, original);
             if (original.categoryId == 8 && !it.TakesLook) BuildTurretModel(it);
@@ -365,6 +367,9 @@ namespace GoF2Remake.UI
                 Add(107, 1, 1, 20, T("mbStatNoteSalvoCount", "Salvos per magazine, a salvo gap apart; then the reload."));
                 Add(108, 0, 0, 60000);
             }
+            if (Flight.Gun.IsBeamLook(item.Look))
+                Add(Flight.Gun.BeamReachAttr, 0, 0, 10000000,
+                    T("mbStatNoteBeamReach", "Maximum beam reach in game units (20 = 1 m). Zero preserves original range rules."));
             if (item.categoryId == 8)
             {
                 Add(16, 0, 0, 1, T("mbStatNoteAuto", "An automatic turret fires at hostiles by itself; else the player aims it."), true);

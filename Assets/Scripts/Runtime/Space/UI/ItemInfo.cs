@@ -81,7 +81,8 @@ namespace GoF2Remake.UI
             string T(int id) => Localization.Get(id);
             string YesNo(int v) => T(v != 0 ? 134 : 135);
             string Signed(int v) => v < 0 ? v.ToString() : "+" + v;   // a weapon mod's factor: +20 or -10
-            bool beam = it.index >= 9 && it.index <= 11 || it.index == 228;
+            bool beam = Flight.Gun.IsBeamLook(it.Look);
+            int customBeamReach = beam ? it.Attr(Flight.Gun.BeamReachAttr) : 0;
             for (int n = 0; n < it.attrKeys.Length; n++)
             {
                 int k = it.attrKeys[n], v = it.attrValues[n];
@@ -100,8 +101,10 @@ namespace GoF2Remake.UI
                             rows.Add((T(188), OriginalDecimals(dmg / (float)v * 1000f)));
                         }
                         break;
+                    case Flight.Gun.BeamReachAttr when beam: break;   // shown as range on the lifetime row
                     case 12:
-                        if (it.categoryId == 11) rows.Add((T(157), $"{v / 1000} s"));   // mines: how long they stay
+                        if (customBeamReach > 0) rows.Add((T(151), $"{Mathf.RoundToInt(customBeamReach * Flight.Gun.MetersPerUnit)} m"));
+                        else if (it.categoryId == 11) rows.Add((T(157), $"{v / 1000} s"));   // mines: how long they stay
                         else
                         {
                             // ListItemWindow::set 0x15a09c: (int)(attr12 / 3600f * (float)(attr13 * 250)), then to the hundred below;

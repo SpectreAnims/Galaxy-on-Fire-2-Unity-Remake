@@ -230,9 +230,14 @@ namespace GoF2Remake.Flight
         public void Charge(float dtMs, bool held) => chargedMs = held ? chargedMs + dtMs : 0f;
         /// <summary>Game units around a beam's line it hits (0 = only what it meets, the original's).</summary>
         public readonly float beamRadius;
-        /// <summary>A wide beam's length with nothing aimed, and how far past its target it sweeps (176 beamReach, game units;
-        /// default the beams' 30 000; Chorus's ProjectileRange).</summary>
+        /// <summary>Explicit beam reach (attribute 176, game units), independent of shot lifetime. Without it, retain the
+        /// original 30 000-unit untargeted beam and original auto-aim limits.</summary>
         public readonly float beamReach = BeamRangeUnits;
+        public readonly bool hasCustomBeamReach;
+        public bool BeamCanReach(Vector3 from, Vector3 to) => !hasCustomBeamReach ||
+            (to - from).sqrMagnitude <= beamReach * MetersPerUnit * (beamReach * MetersPerUnit);
+        public Vector3 BeamMuzzle(Vector3 origin, Quaternion rotation) =>
+            origin + rotation * (mountLocal + Vector3.forward * SpawnForwardUnits * MetersPerUnit);
         public readonly int heatShots;
         public readonly float heatCoolMs, overheatMs;
         float heat, overheatLeftMs;
@@ -277,7 +282,8 @@ namespace GoF2Remake.Flight
             vulnerableMs = Mathf.Max(0, item.Attr(VulnerableMsAttr));
             echo = GunEcho.From(item);
             beamRadius = isBeam ? Mathf.Max(0, item.Attr(BeamRadiusAttr)) : 0f;
-            if (beamRadius > 0f) beamReach = Mathf.Max(1, item.Attr(BeamReachAttr, (int)BeamRangeUnits));
+            hasCustomBeamReach = isBeam && item.Attr(BeamReachAttr) > 0;
+            if (hasCustomBeamReach) beamReach = item.Attr(BeamReachAttr);
             heatShots = Mathf.Max(0, item.Attr(HeatShotsAttr));
             chargeMs = Mathf.Max(0, item.Attr(ChargeMsAttr));
             heatCoolMs = Mathf.Max(1, item.Attr(HeatCoolMsAttr, 10000));
@@ -401,6 +407,7 @@ namespace GoF2Remake.Flight
                 var target = AutoAim?.Invoke();
                 ref var bb = ref bullets[0];
                 var from = Spawn();
+                if (target != null && !BeamCanReach(from, target.transform.position)) target = null;
                 if (target != null)
                 {
                     var d = target.transform.position - from;
@@ -418,7 +425,8 @@ namespace GoF2Remake.Flight
                     beamAim = null;
                     bb.position = from + fwd * beamReach * MetersPerUnit;
                 }
-                bb.velocity = fwd * MetersPerUnit;   // a unit vector (1 u/ms): hits the target centre on the next pass
+                // Configured beams are hitscan: their endpoints must not drift beyond their specified reach.
+                bb.velocity = hasCustomBeamReach ? Vector3.zero : fwd * MetersPerUnit;
                 bb.up = up;
                 bb.timer = lifetimeMs;
                 bb.age = 0f;
@@ -611,6 +619,7 @@ namespace GoF2Remake.Flight
                 bool fresh = b.age <= 0f;   // its first pass since it was fired
                 b.timer -= dtMs;
                 b.age += dtMs;
+                if (isBeam && hasCustomBeamReach && !fresh) continue;   // a single hitscan pass
                 if (Coasts && b.timer <= limit) { Expired?.Invoke(i); continue; }   // Gun::update: a rocket ran out
                 if (kind == Kind.ShockBlast) { Ignite(targets); continue; }   // one instant blast at the ship
                 var from = b.position;   // the hull test sweeps this frame's path
@@ -812,6 +821,27 @@ namespace GoF2Remake.Flight
                     return;
                 }
             }
+            // Configured beams also sweep legacy hit cubes/boxes along the full ray, not merely its endpoint.
+            if (isBeam && hasCustomBeamReach)
+            {
+                Target nearest = null;
+                float best = float.PositiveInfinity;
+                for (int k = 0; k < targets.Count; k++)
+                {
+                    var t = targets[k];
+                    if (t == null || t == owner || !t.Alive || t.phased || (Ignores != null && Ignores(t)) ||
+                        (hulls && t.HasHull)) continue;
+                    float f = BeamBoxFraction(t, from, b.position);
+                    if (f < best) { best = f; nearest = t; }
+                }
+                if (nearest != null)
+                {
+                    var point = Vector3.Lerp(from, b.position, best);
+                    b.timer = -1e9f;
+                    if (Strike(i, nearest, point)) Struck(point);
+                }
+                return;
+            }
             // A long list: only the grid's targets near the shot (TargetGrid), taken in the list's order as the walk finds them.
             bool gridded = !scatter && Gridded(targets);
             if (gridded)
@@ -844,6 +874,30 @@ namespace GoF2Remake.Flight
                 Struck(point);
                 return;
             }
+        }
+
+        // Segment fraction of the first legacy hit volume crossed; infinity for a miss.
+        static float BeamBoxFraction(Target target, Vector3 from, Vector3 to)
+        {
+            if (target.boxes != null && target.boxes.Length > 0)
+            {
+                from = target.transform.InverseTransformPoint(from);
+                to = target.transform.InverseTransformPoint(to);
+                float best = float.PositiveInfinity;
+                foreach (var box in target.boxes) best = Mathf.Min(best, BoxFraction(box, from, to));
+                return best;
+            }
+            return BoxFraction(new Bounds(target.transform.position, Vector3.one * (2f * target.radius)), from, to);
+        }
+
+        static float BoxFraction(Bounds box, Vector3 from, Vector3 to)
+        {
+            if (box.Contains(from)) return 0f;
+            var delta = to - from;
+            float length = delta.magnitude;
+            if (length <= 1e-6f) return float.PositiveInfinity;
+            return box.IntersectRay(new Ray(from, delta / length), out float distance) && distance <= length
+                ? distance / length : float.PositiveInfinity;
         }
 
         /// <summary>Remake (#192): an aimed beam whose first pass met nothing still hits its target. Its sweep ends at the
