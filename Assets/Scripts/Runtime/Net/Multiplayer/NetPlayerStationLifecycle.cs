@@ -14,8 +14,15 @@ namespace GoF2Remake.Multiplayer
         const float LegacyWreckMaxIntegrity = 12000f;
         const int ReconstructionPercent = 50;
 
-        internal static PlayerStationRecord StationAt(int orbit) =>
-            registry?.stations?.Find(station => station != null && station.stationIndex == orbit);
+        internal static PlayerStationRecord StationAt(int orbit)
+        {
+            EnsureStationIndex();
+            if (!stationsByOrbit.TryGetValue(orbit, out var station)) return null;
+            if (station.existingOrbit && NetGame.Db != null &&
+                (!OrbitLayout.VacantStationSite(orbit, Session.WorldIndex) ||
+                 NetGame.Db.Stations.Find(anchor => anchor != null && anchor.index == orbit)?.system != station.system)) return null;
+            return station;
+        }
 
         public static Vector3 StationPosition(int orbit) =>
             new Vector3(StationAt(orbit)?.stationOffsetX ?? 0f, 0f, 0f);
@@ -69,6 +76,7 @@ namespace GoF2Remake.Multiplayer
         {
             id = station.id,
             stationIndex = station.stationIndex,
+            existingOrbit = station.existingOrbit,
             system = station.system,
             looksLike = station.looksLike,
             stationModelReference = station.stationModelReference,
@@ -76,6 +84,7 @@ namespace GoF2Remake.Multiplayer
             name = station.name,
             createdUtc = station.createdUtc,
             nextShipListingId = station.nextShipListingId,
+            nextItemListingId = station.nextItemListingId,
             donatedConstructionStock = station.donatedConstructionStock
         };
 
@@ -107,7 +116,7 @@ namespace GoF2Remake.Multiplayer
 
             int index = registry.stations.IndexOf(station);
             var originalRegistry = registry;
-            registry.stations[index] = site;
+            ReplaceStationRecord(originalRegistry, index, site);
             long payout = wasOperational ? StationCompensation(station) : 0;
             bool factionOwned = station.ownershipType == PlayerStationOwnershipType.Faction;
             string recipient = factionOwned ? station.ownerFactionId : station.ownerProfile;
@@ -124,7 +133,7 @@ namespace GoF2Remake.Multiplayer
             bool saved = validOrders && (credits.Count == 0 && banks.Count == 0 ? Save() : CommitProfileTransaction(null, credits, banks));
             if (!saved)
             {
-                if (ReferenceEquals(registry, originalRegistry)) registry.stations[index] = station;
+                if (ReferenceEquals(registry, originalRegistry)) ReplaceStationRecord(originalRegistry, index, station);
                 return false;
             }
 
@@ -266,10 +275,10 @@ namespace GoF2Remake.Multiplayer
 
             int index = registry.stations.IndexOf(wreck);
             var originalRegistry = registry;
-            registry.stations[index] = project;
+            ReplaceStationRecord(originalRegistry, index, project);
             if (!Save())
             {
-                if (ReferenceEquals(registry, originalRegistry)) registry.stations[index] = wreck;
+                if (ReferenceEquals(registry, originalRegistry)) ReplaceStationRecord(originalRegistry, index, wreck);
                 return "The reconstruction project could not be saved.";
             }
             wreckControl.Remove(id);
@@ -411,9 +420,11 @@ namespace GoF2Remake.Multiplayer
             if (registry.orbitalStructures?.Exists(structure => structure != null && structure.orbit == record.stationIndex) == true)
                 return "Dismantle or destroy the remaining orbital structures before retiring this orbit.";
             record.retired = true;
+            indexedStationCount = -1;
             if (!Save())
             {
                 record.retired = false;
+                indexedStationCount = -1;
                 return "Retirement could not be saved.";
             }
             Apply(NetGame.Db);

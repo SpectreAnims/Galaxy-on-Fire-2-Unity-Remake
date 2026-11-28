@@ -222,6 +222,92 @@ namespace GoF2Remake.Tests
                 detonation, surface, surface, 20f, 40f), "the detonation applies only once");
         }
 
+        [Test]
+        public void RepeatedShotRegistrationCannotRearmConsumedGateHit()
+        {
+            const ulong source = 100004;
+            const uint shot = 104;
+            var point = Vector3.forward * 100f;
+            NetShotRegistry.Register(source, shot, 55, NetShots.NoTarget, 10000f, Vector3.zero, Vector3.forward * 200f);
+            Assert.IsTrue(NetShotRegistry.TryConsumeGateHit(source, shot, 55, point, point, 20f));
+            NetShotRegistry.Register(source, shot, 55, NetShots.NoTarget, 10000f, Vector3.zero, Vector3.forward * 200f);
+            Assert.IsFalse(NetShotRegistry.TryConsumeGateHit(source, shot, 55, point, point, 20f));
+        }
+
+        [Test]
+        public void StationSnapshotDecodesPaddedChunksAndSplitUtf8()
+        {
+            string original = new string('x', 2799) + "é" + new string('z', 2800);
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(original);
+            var chunks = new System.Collections.Generic.List<string>();
+            for (int offset = 0; offset < bytes.Length; offset += 2800)
+                chunks.Add(System.Convert.ToBase64String(bytes, offset, System.Math.Min(2800, bytes.Length - offset)));
+            Assert.AreEqual(original, NetState.DecodePlayerStationChunks(chunks.ToArray()));
+        }
+
+        [Test]
+        public void StationSnapshotRejectsTruncatedIntermediateChunk()
+        {
+            Assert.Throws<System.FormatException>(() => NetState.DecodePlayerStationChunks(new[] { "YQ==", "Yg==" }));
+        }
+
+        [Test]
+        public void NewStorageLotDoesNotCreditStationOwnerForVisitorDeposit()
+        {
+            var station = new PlayerStationRecord { ownerProfile = "owner" };
+            station.storage.Add(new PlayerStationStorage { item = 156, amount = 10 });
+            var add = typeof(NetPlayerStations).GetMethod("AddStorageLot",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Assert.IsNotNull(add);
+            add.Invoke(null, new object[] { station, "visitor", 156, 10 });
+            Assert.AreEqual(1, station.storageLots.Count);
+            Assert.AreEqual("visitor", station.storageLots[0].ownerProfile);
+            Assert.AreEqual(10, station.storageLots[0].amount);
+            Assert.AreEqual(10, station.storage[0].amount);
+        }
+
+        [Test]
+        public void PlayerGateInteractionRequiresFiniteNearbyPosition()
+        {
+            var centre = Vector3.forward * 5000f;
+            Assert.IsTrue(NetPlayerStations.GateInteractionInRange(centre, centre, 375f));
+            Assert.IsTrue(NetPlayerStations.GateInteractionInRange(centre + Vector3.right * 450f, centre, 375f));
+            Assert.IsFalse(NetPlayerStations.GateInteractionInRange(centre + Vector3.right * 476f, centre, 375f));
+            Assert.IsFalse(NetPlayerStations.GateInteractionInRange(Vector3.zero, centre, 375f));
+            Assert.IsFalse(NetPlayerStations.GateInteractionInRange(centre, centre, float.NaN));
+            Assert.IsFalse(NetPlayerStations.GateInteractionInRange(centre, centre, 0f));
+        }
+
+        [Test]
+        public void PercentageFactionTollDoesNotOverflowLongCreditBalances()
+        {
+            Assert.AreEqual(500, NetFactions.TollFor(-5, 10000));
+            Assert.AreEqual(1, NetFactions.TollFor(-5, 0));
+            Assert.AreEqual(int.MaxValue, NetFactions.TollFor(-100, long.MaxValue));
+            Assert.AreEqual(int.MaxValue, NetFactions.TollFor(-5, long.MaxValue));
+        }
+
+        [Test]
+        public void ItemListingIdsSurviveListRemovalAndLegacyMigration()
+        {
+            var station = new PlayerStationRecord();
+            station.listings.Add(new PlayerStationListing { id = 7, item = 156 });
+            station.listings.Add(new PlayerStationListing { item = 155 });
+            station.listings.Add(new PlayerStationListing { id = 7, item = 118 });
+            var normalize = typeof(NetPlayerStations).GetMethod("NormalizeItemListingIds",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Assert.IsNotNull(normalize);
+            normalize.Invoke(null, new object[] { station });
+            Assert.AreEqual(7, station.listings[0].id);
+            Assert.AreEqual(8, station.listings[1].id);
+            Assert.AreEqual(9, station.listings[2].id);
+            station.listings.RemoveAt(0);
+            normalize.Invoke(null, new object[] { station });
+            Assert.AreEqual(8, station.listings[0].id);
+            Assert.AreEqual(9, station.listings[1].id);
+            Assert.AreEqual(10, station.nextItemListingId);
+        }
+
         // ---- NetRateLimit ----
 
         [SetUp]

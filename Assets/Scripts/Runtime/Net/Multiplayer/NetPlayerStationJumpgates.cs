@@ -72,6 +72,7 @@ namespace GoF2Remake.Multiplayer
             bool empEligible = !gate.scrapped && empDamage > 0f && empDamage >= JumpgateEmpThreshold;
             if (!structuralEligible && !empEligible) return false;
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var originalRegistry = registry;
             int index = registry.jumpgates.IndexOf(gate);
             var previous = JsonUtility.FromJson<PlayerJumpgateRecord>(JsonUtility.ToJson(gate));
             if (gate.scrapped) InitializeGateScrap(gate);
@@ -95,12 +96,35 @@ namespace GoF2Remake.Multiplayer
                         orbitStationIndex, gate.empShutdownUntilUtc);
                 return true;
             }
-            registry.jumpgates[index] = previous;
+            if (ReferenceEquals(registry, originalRegistry)) ReplaceGateRecord(originalRegistry, index, previous);
             return false;
         }
 
-        internal static PlayerJumpgateRecord FindJumpgate(int orbitStationIndex) =>
-            registry?.jumpgates?.Find(x => x != null && x.orbitStationIndex == orbitStationIndex);
+        static Registry indexedGateRegistry;
+        static int indexedGateCount = -1;
+        static readonly Dictionary<int, PlayerJumpgateRecord> gatesByOrbit = new Dictionary<int, PlayerJumpgateRecord>();
+
+        static void ReplaceGateRecord(Registry target, int index, PlayerJumpgateRecord replacement)
+        {
+            target.jumpgates[index] = replacement;
+            if (ReferenceEquals(target, indexedGateRegistry)) indexedGateCount = -1;
+        }
+
+        internal static PlayerJumpgateRecord FindJumpgate(int orbitStationIndex)
+        {
+            int count = registry?.jumpgates?.Count ?? 0;
+            if (!ReferenceEquals(indexedGateRegistry, registry) || indexedGateCount != count)
+            {
+                gatesByOrbit.Clear();
+                indexedGateRegistry = registry;
+                indexedGateCount = count;
+                if (registry?.jumpgates != null)
+                    foreach (var gate in registry.jumpgates)
+                        if (gate != null && !gatesByOrbit.ContainsKey(gate.orbitStationIndex))
+                            gatesByOrbit.Add(gate.orbitStationIndex, gate);
+            }
+            return gatesByOrbit.TryGetValue(orbitStationIndex, out var result) ? result : null;
+        }
 
         static PlayerStationRecord JumpgateAccessRecord(PlayerJumpgateRecord gate) => gate == null ? null : new PlayerStationRecord
         {
@@ -171,14 +195,17 @@ namespace GoF2Remake.Multiplayer
                 HasRole(station, managerAccount, PlayerStationRole.StationAdministrator)) == true;
         }
 
+        internal static bool ConstructionGateAllowed(PlayerJumpgateRecord gate, string account, string factionId) => JumpgateAccessAllowed(gate, account, factionId);
+
         static bool JumpgateAccessAllowed(PlayerJumpgateRecord gate, string account, string factionId)
         {
-            if (gate == null || gate.scrapped || gate.permanentlyDestroyed || gate.building ||
+            if (gate == null || gate.scrapped || gate.permanentlyDestroyed || gate.building || gate.explosionPending ||
+                (gate.combatStateInitialized && gate.structuralIntegrity <= 0f) || gate.destinationSystem < 0 ||
                 gate.empShutdownUntilUtc > DateTimeOffset.UtcNow.ToUnixTimeSeconds()) return false;
             // A faction owns the infrastructure, but individual members remain subject to the
             // blacklist. Only an individually owned gate's actual owner bypasses its blacklist.
             bool owner = gate.ownershipType == PlayerStationOwnershipType.Individual &&
-                string.Equals(account, gate.ownerProfile, StringComparison.Ordinal);
+                !string.IsNullOrEmpty(account) && string.Equals(account, gate.ownerProfile, StringComparison.Ordinal);
             if (owner) return true;
             if (gate.accessMode == PlayerJumpgateAccessMode.OwnerOnly) return false;
             if (gate.blacklist != null)
@@ -408,7 +435,8 @@ namespace GoF2Remake.Multiplayer
         public static bool JumpgateOffline(int stationIndex)
         {
             var gate = FindJumpgate(stationIndex);
-            return gate != null && (gate.building || gate.scrapped || gate.permanentlyDestroyed ||
+            return gate != null && (gate.building || gate.scrapped || gate.permanentlyDestroyed || gate.explosionPending ||
+                (gate.combatStateInitialized && gate.structuralIntegrity <= 0f) ||
                 gate.empShutdownUntilUtc > DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         }
 
@@ -616,12 +644,18 @@ namespace GoF2Remake.Multiplayer
             }
             registry.jumpgates ??= new List<PlayerJumpgateRecord>();
             int existingIndex = stationRebuild ? registry.jumpgates.IndexOf(existingGate) : -1;
-            if (stationRebuild && existingIndex >= 0) registry.jumpgates[existingIndex] = gate;
+            var originalRegistry = registry;
+            if (stationRebuild && existingIndex >= 0) ReplaceGateRecord(originalRegistry, existingIndex, gate);
             else registry.jumpgates.Add(gate);
+            indexedGateCount = -1;
             if (!Save())
             {
-                if (stationRebuild && existingIndex >= 0) registry.jumpgates[existingIndex] = existingGate;
-                else registry.jumpgates.Remove(gate);
+                if (ReferenceEquals(registry, originalRegistry))
+                {
+                    if (stationRebuild && existingIndex >= 0) ReplaceGateRecord(originalRegistry, existingIndex, existingGate);
+                    else originalRegistry.jumpgates.Remove(gate);
+                    indexedGateCount = -1;
+                }
                 return "The jumpgate construction plan could not be saved.";
             }
             return "Jumpgate project started in orbit " + orbitStationIndex + " of " + origin.name +
@@ -842,13 +876,15 @@ namespace GoF2Remake.Multiplayer
             if (targetType == "player")
             {
                 type = PlayerJumpgateBlockType.Profile;
-                id = NetProfiles.FindAccount((target ?? "").Trim());
+                id = ResolveStationAccount(target);
                 if (string.IsNullOrEmpty(id)) return "Supply a valid player profile or account name.";
             }
             else if (targetType == "faction")
             {
                 type = PlayerJumpgateBlockType.Faction;
                 var faction = NetFactions.FindById((target ?? "").Trim());
+                if (faction == null && (target ?? "").StartsWith("online:", StringComparison.OrdinalIgnoreCase))
+                    faction = NetFactions.Of(ResolveStationAccount(target));
                 id = faction?.id;
                 if (string.IsNullOrEmpty(id)) return "Supply a valid faction ID.";
             }
@@ -881,18 +917,34 @@ namespace GoF2Remake.Multiplayer
         {
             var gate = FindJumpgate(orbitStationIndex);
             if (gate == null || by == null || !by.IsSpawned) return false;
-            return NetGame.IsServer && JumpgateAccessAllowed(gate, by.ProfileAccount, by.FactionId);
+            if (!NetGame.IsServer)
+                return by.HasPlayerJumpgateAccess(orbitStationIndex) && !gate.building && !gate.scrapped &&
+                    !gate.permanentlyDestroyed && !gate.explosionPending &&
+                    gate.empShutdownUntilUtc <= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            string account = NetProfiles.AccountOf(by.OwnerClientId);
+            return JumpgateAccessAllowed(gate, account, NetFactions.Of(account)?.id);
         }
 
         /// <summary>Server validation for the owner-only interaction RPC. Returns -1 unless the player is at an accessible, operational gate.</summary>
         internal static int JumpgateDestinationForInteraction(NetPlayer by, int orbitStationIndex)
         {
-            if (!NetGame.IsServer || !sessionActive || by == null || !by.IsSpawned ||
-                !by.InSpace || by.Station != orbitStationIndex || !CanUseJumpgate(by, orbitStationIndex)) return -1;
-            var gate = FindJumpgate(orbitStationIndex);
-            CompleteJumpgateIfDue(gate);
-            return gate != null && !gate.building && !gate.scrapped && !gate.permanentlyDestroyed
-                ? gate.destinationSystem : -1;
+            if (!NetGame.IsServer || !sessionActive || ProfileWritesBlocked || by == null || !by.IsSpawned ||
+                !by.InSpace || by.Hull <= 0f || by.Station != orbitStationIndex || !by.HasCurrentWreckClaimPose ||
+                !NetProfiles.Controls(by.OwnerClientId) || !CanUseJumpgate(by, orbitStationIndex)) return -1;
+            var layout = GoF2Remake.World.OrbitLayout.Build(NetGame.Db, orbitStationIndex, includePlayerGateLandmark: true);
+            if (layout == null || !layout.hasJumpgate) return -1;
+            var centre = GoF2Remake.World.OrbitLayout.ToUnity(layout.Place(layout.jumpgate));
+            float radius = layout.JumpgateRadius * GoF2Remake.World.OrbitLayout.MetersPerUnit;
+            if (!GateInteractionInRange(by.Position, centre, radius)) return -1;
+            return FindJumpgate(orbitStationIndex)?.destinationSystem ?? -1;
+        }
+
+        // Allow a bounded margin for the most recent network pose, not arbitrary orbit-wide activation.
+        internal static bool GateInteractionInRange(Vector3 position, Vector3 centre, float radius)
+        {
+            if (!NetGuard.Position(position) || !NetGuard.Position(centre) || !NetGuard.Finite(radius) || radius <= 0f) return false;
+            float reach = radius + Mathf.Clamp(radius * 0.25f, 100f, 250f);
+            return (position - centre).sqrMagnitude <= reach * reach;
         }
 
         internal static string JumpgateOrbits(int systemIndex)
@@ -964,6 +1016,7 @@ namespace GoF2Remake.Multiplayer
             if (!NetGame.IsServer || !sessionActive || registry == null) return false;
             var gate = FindJumpgate(orbitStationIndex);
             if (gate == null || gate.building || gate.scrapped || gate.permanentlyDestroyed) return false;
+            var originalRegistry = registry;
             int index = registry.jumpgates.IndexOf(gate);
             var previous = JsonUtility.FromJson<PlayerJumpgateRecord>(JsonUtility.ToJson(gate));
             TransitionDestroyedGate(gate);
@@ -972,7 +1025,7 @@ namespace GoF2Remake.Multiplayer
                     new PlayerStationMaterial { item = x.item, required = x.required, delivered = 0 });
             if (!Save())
             {
-                registry.jumpgates[index] = previous;
+                if (ReferenceEquals(registry, originalRegistry)) ReplaceGateRecord(originalRegistry, index, previous);
                 salvage.Clear();
                 return false;
             }
@@ -1025,6 +1078,7 @@ namespace GoF2Remake.Multiplayer
                 return factionClaim
                     ? "At least one member of the claiming faction must discover the selected destination."
                     : "You must personally discover the selected destination before reclaiming this gate.";
+            var originalRegistry = registry;
             int index = registry.jumpgates.IndexOf(gate);
             var previous = JsonUtility.FromJson<PlayerJumpgateRecord>(JsonUtility.ToJson(gate));
             gate.ownershipType = factionClaim ? PlayerStationOwnershipType.Faction : PlayerStationOwnershipType.Individual;
@@ -1057,7 +1111,7 @@ namespace GoF2Remake.Multiplayer
             gate.explosionPending = false;
             if (!Save())
             {
-                registry.jumpgates[index] = previous;
+                if (ReferenceEquals(registry, originalRegistry)) ReplaceGateRecord(originalRegistry, index, previous);
                 return "The reclaimed gate could not be saved; its scrapped state is unchanged.";
             }
             return "Jumpgate claimed " + (factionClaim ? "on behalf of " + faction.name : "by " + by.DisplayName) +

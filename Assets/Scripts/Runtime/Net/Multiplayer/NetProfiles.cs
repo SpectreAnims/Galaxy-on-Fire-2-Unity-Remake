@@ -89,9 +89,11 @@ namespace GoF2Remake.Multiplayer
             public bool controller;
             public float acceptedAt;   // real time of the login or the last accepted upload (the earning allowance)
             public int acceptedUploadSequence, lastAcceptedUploadSequence;
+            public long economyRevision;
+            public bool economyRevisionDirty;
         }
 
-        class Incoming { public int seq, count, got; public byte[][] parts; }
+        class Incoming { public int seq, count, got; public long economyRevision; public byte[][] parts; }
 
         static bool configured;
         static string folder;
@@ -228,7 +230,7 @@ namespace GoF2Remake.Multiplayer
         /// (its profile is written when it leaves).</summary>
         internal static bool MoveCredits(ulong client, string id, long delta)
         {
-            if (id == null) return false;
+            if (id == null || NetPlayerStations.ProfileWritesBlocked) return false;
             if (IsHostClient(client)) { AdjustWorth(id, delta); return true; }
             var save = ReadSave(id);
             if (save == null)
@@ -242,6 +244,7 @@ namespace GoF2Remake.Multiplayer
             save.credits = now;
             if (!Write(ProfilePath(id), JsonUtility.ToJson(save, false))) return false;
             AdjustWorth(id, delta);
+            InvalidateEconomyUploads(id);
             return true;
         }
 
@@ -249,7 +252,8 @@ namespace GoF2Remake.Multiplayer
         /// authority for its own save; another player's last uploaded profile is changed before its game is updated.</summary>
         internal static bool MoveCargo(ulong client, string id, int item, int delta)
         {
-            if (id == null || item < 0 || delta == 0 || NetGame.Db.Item(item) == null) return false;
+            if (id == null || item < 0 || delta == 0 || NetGame.Db.Item(item) == null ||
+                NetPlayerStations.ProfileWritesBlocked) return false;
             if (IsHostClient(client))
             {
                 int have = Shop.CargoOf(item);
@@ -275,6 +279,7 @@ namespace GoF2Remake.Multiplayer
             if (!Write(ProfilePath(id), JsonUtility.ToJson(save, false))) return false;
             int unitValue = Math.Max(0, NetGame.Db.Item(item)?.minPrice ?? 0);
             AdjustWorth(id, (long)unitValue * delta);
+            InvalidateEconomyUploads(id);
             return true;
         }
 
@@ -307,7 +312,8 @@ namespace GoF2Remake.Multiplayer
 
             int from = db.Stations.Find(station => station.index == origin)?.system ?? -1;
             int to = db.Stations.Find(station => station.index == destination)?.system ?? -1;
-            if (from < 0 || from == to || !Visible(to)) return null;
+            if (from < 0 || from == to || !Visible(to) ||
+                !NetPlayerStations.CanVisitStation(destination, login.account.id)) return null;
 
             // Network profiles play on Normal. Fuel and the outcome are derived on the server.
             int cells = GalaxyMap.EnergyCells(db, from, to, false, drive, drive.freeJumps, out _);
@@ -323,6 +329,7 @@ namespace GoF2Remake.Multiplayer
             {
                 var candidates = World.SystemJump.MisjumpDestinations(db, origin, destination, Session.WorldIndex,
                     Visible, requireConnected: true);
+                candidates.RemoveAll(station => !NetPlayerStations.CanVisitStation(station, login.account.id));
                 if (candidates.Count > 0)
                 {
                     misjump = true;
@@ -356,12 +363,28 @@ namespace GoF2Remake.Multiplayer
             if (!Write(ProfilePath(login.account.id), JsonUtility.ToJson(save, false))) return null;
             login.account.worth = Worth(save);
             SaveIndex();
+            InvalidateEconomyUploads(login.account.id);
             return new GameHooks.ModJumpResult(arrival, cells, lostItem, hullLimit, misjump);
+        }
+
+        // Invalidate uploads immediately; publish the barrier on the next server tick, after
+        // synchronous transaction callers have sent their existing reliable economy updates.
+        internal static void InvalidateEconomyUploads(string account)
+        {
+            if (string.IsNullOrEmpty(account)) return;
+            foreach (var login in logins.Values)
+            {
+                if (login.account == null || login.account.id != account || IsHostClient(login.client)) continue;
+                login.economyRevision++;
+                login.economyRevisionDirty = true;
+                login.acceptedUploadSequence = 0;
+                incoming.Remove(login.client);
+            }
         }
 
         internal static bool ConsumeActionUpload(ulong client, int sequence)
         {
-            if (sequence == 0 || !logins.TryGetValue(client, out var login) ||
+            if (NetPlayerStations.ProfileWritesBlocked || sequence == 0 || !logins.TryGetValue(client, out var login) ||
                 !login.controller || login.account == null || login.acceptedUploadSequence != sequence) return false;
             login.acceptedUploadSequence = 0;
             return true;
@@ -547,6 +570,36 @@ namespace GoF2Remake.Multiplayer
             return definition?.initiallyVisible == true || system == GalaxyMap.LomaSystem;
         }
 
+        internal static bool CanReachConstructionSystem(NetPlayer pilot, int destination) => ConstructionReachableSystems(pilot).Contains(destination);
+
+        internal static HashSet<int> ConstructionReachableSystems(NetPlayer pilot)
+        {
+            if (pilot == null || !Controls(pilot.OwnerClientId)) return new HashSet<int>();
+            var db = NetGame.Db;
+            int origin = db?.Stations?.Find(station => station != null && station.index == pilot.Station)?.system ?? -1;
+            if (origin < 0) return new HashSet<int>();
+            string account = AccountOf(pilot.OwnerClientId);
+            var save = ReadSave(account);
+            bool host = IsHostClient(pilot.OwnerClientId);
+            var visible = host ? GalaxyMap.Visibility(db) : save?.systemVisible;
+            var gateDiscoveries = index?.accounts?.Find(entry => entry != null && entry.id == account)?.gateDiscoveredSystems;
+            bool Discovered(int system) => system >= 0 && ((visible != null && system < visible.Length && visible[system]) ||
+                gateDiscoveries?.Contains(system) == true || db.Systems.Find(entry => entry != null && entry.index == system)?.initiallyVisible == true || system == GalaxyMap.LomaSystem);
+            string faction = NetFactions.Of(account)?.id;
+            var reachable = NetPlayerStations.ReachableConstructionSystems(origin, Discovered,
+                gate => NetPlayerStations.ConstructionGateAllowed(gate, account, faction));
+            reachable.RemoveWhere(system => !Discovered(system));
+            var drive = host ? Modding.ModJumpFx.ActiveDrive() : save == null ? null : Modding.ModJumpFx.ActiveDrive(save.ship, save.equipment);
+            if (drive?.hasJumpRules != true || (!host && save.ship != pilot.ShipIndex)) return reachable;
+            if (host ? GalaxyMap.HasVolatileGoods : save.cargo?.Exists(stack => stack != null && stack.amount > 0 && (stack.item == 209 || stack.item == 204)) == true) return reachable;
+            int fuel = host ? GalaxyMap.CellsInCargo() : save.cargo?.Find(stack => stack != null && stack.item == GalaxyMap.EnergyCellItem)?.amount ?? 0;
+            foreach (var system in db.Systems)
+                if (system != null && !reachable.Contains(system.index) && Discovered(system.index) &&
+                    GalaxyMap.EnergyCells(db, origin, system.index, false, drive, drive.freeJumps, out _) <= fuel)
+                    reachable.Add(system.index);
+            return reachable;
+        }
+
         internal static bool HasFactionDiscoveredSystem(string factionId, int system)
         {
             var faction = NetFactions.FindById(factionId);
@@ -558,7 +611,7 @@ namespace GoF2Remake.Multiplayer
 
         internal static bool DiscoverSystem(string id, int system)
         {
-            if (string.IsNullOrEmpty(id) || NetGame.Db?.Systems == null ||
+            if (NetPlayerStations.ProfileWritesBlocked || string.IsNullOrEmpty(id) || NetGame.Db?.Systems == null ||
                 NetGame.Db.Systems.Find(x => x != null && x.index == system) == null) return false;
             var account = index?.accounts?.Find(x => x != null && string.Equals(x.id, id, StringComparison.Ordinal));
             if (account == null) return false;
@@ -566,7 +619,11 @@ namespace GoF2Remake.Multiplayer
             if (!account.gateDiscoveredSystems.Contains(system))
             {
                 account.gateDiscoveredSystems.Add(system);
-                SaveIndex();
+                if (!Write(IndexPath, JsonUtility.ToJson(index, true)))
+                {
+                    account.gateDiscoveredSystems.Remove(system);
+                    return false;
+                }
             }
             var save = ReadSave(id);
             bool host = false;
@@ -594,16 +651,21 @@ namespace GoF2Remake.Multiplayer
             int count = 0;
             foreach (var system in NetGame.Db.Systems) if (system != null) count = Math.Max(count, system.index + 1);
             if (count <= 0) return;
-            var visible = new bool[count];
-            for (int i = 0; i < count; i++)
+            bool[] visible = save.systemVisible;
+            if (visible == null || visible.Length != count)
             {
-                var definition = NetGame.Db.Systems.Find(x => x != null && x.index == i);
-                visible[i] = save.systemVisible != null && i < save.systemVisible.Length
-                    ? save.systemVisible[i] : definition?.initiallyVisible == true;
+                int oldLength = visible?.Length ?? 0;
+                var resized = new bool[count];
+                if (visible != null) Array.Copy(visible, resized, Math.Min(oldLength, count));
+                foreach (var definition in NetGame.Db.Systems)
+                    if (definition != null && definition.index >= oldLength && definition.index < count)
+                        resized[definition.index] = definition.initiallyVisible;
+                visible = resized;
             }
-            if (GalaxyMap.LomaSystem < visible.Length) visible[GalaxyMap.LomaSystem] = true;
-            foreach (int discovered in account?.gateDiscoveredSystems ?? new List<int>())
-                if (discovered >= 0 && discovered < visible.Length) visible[discovered] = true;
+            if (GalaxyMap.LomaSystem >= 0 && GalaxyMap.LomaSystem < visible.Length) visible[GalaxyMap.LomaSystem] = true;
+            if (account?.gateDiscoveredSystems != null)
+                foreach (int discovered in account.gateDiscoveredSystems)
+                    if (discovered >= 0 && discovered < visible.Length) visible[discovered] = true;
             save.systemVisible = visible;
         }
 
@@ -660,6 +722,71 @@ namespace GoF2Remake.Multiplayer
             if (save.kaamoShips.Count >= 100) return false;
             save.kaamoShips.Add(ship);
             return Write(ProfilePath(id), JsonUtility.ToJson(save, false));
+        }
+
+        /// <summary>Apply one journal account's absolute targets in a single durable profile write.</summary>
+        internal static bool ApplyStationProfileTargets(string id, Dictionary<int, int> cargo, long? credits, List<StoredShip> ships)
+        {
+            if (string.IsNullOrEmpty(id) || (credits.HasValue && credits.Value < 0)) return false;
+            if (ships != null && (ships.Count > 100 || ships.Exists(x => x == null || x.ship < 0))) return false;
+            foreach (var pair in cargo)
+                if (pair.Key < 0 || pair.Value < 0 || NetGame.Db?.Item(pair.Key) == null) return false;
+
+            bool host = false;
+            foreach (var login in logins.Values)
+                if (login.account != null && login.account.id == id && IsHostClient(login.client))
+                { host = true; break; }
+            var save = ReadSave(id);
+            if (save == null && host)
+            {
+                try { save = JsonUtility.FromJson<SaveData>(SaveGame.ProfileJson()); }
+                catch (Exception e) { Debug.LogError($"NetProfiles: could not seed station profile: {e.Message}"); }
+            }
+            if (save == null) return false;
+            save.cargo ??= new List<ItemStack>();
+            foreach (var pair in cargo)
+            {
+                var stack = save.cargo.Find(x => x != null && x.item == pair.Key);
+                if (stack == null && pair.Value > 0) save.cargo.Add(new ItemStack(pair.Key, pair.Value));
+                else if (stack != null)
+                {
+                    stack.amount = pair.Value;
+                    if (pair.Value == 0) save.cargo.Remove(stack);
+                }
+            }
+            if (credits.HasValue) save.credits = credits.Value;
+            if (ships != null) save.kaamoShips = new List<StoredShip>(ships);
+            if (!Write(ProfilePath(id), JsonUtility.ToJson(save, false))) return false;
+
+            if (host)
+            {
+                foreach (var pair in cargo)
+                {
+                    int before = Shop.CargoOf(pair.Key);
+                    if (before < pair.Value) Shop.AddToCargo(pair.Key, pair.Value - before);
+                    else if (before > pair.Value) Shop.RemoveFromCargo(pair.Key, before - pair.Value);
+                }
+                if (credits.HasValue)
+                {
+                    Session.Credits = credits.Value;
+                    GoF2Remake.UI.UiHooks.RefreshStationCredits?.Invoke();
+                }
+                if (ships != null)
+                {
+                    Session.KaamoShips ??= new List<StoredShip>();
+                    Session.KaamoShips.Clear();
+                    Session.KaamoShips.AddRange(ships);
+                }
+                if (cargo.Count > 0) GoF2Remake.UI.UiHooks.StationCargoChanged?.Invoke();
+            }
+            // Recompute from the durable target, rather than applying a delta twice on replay.
+            var account = index?.accounts.Find(x => x.id == id);
+            if (account != null)
+            {
+                account.worth = Worth(save);
+                SaveIndex();
+            }
+            return true;
         }
 
         /// <summary>Replace a profile's complete stored-hull list with an absolute target for journal replay.</summary>
@@ -774,10 +901,17 @@ namespace GoF2Remake.Multiplayer
             try
             {
                 string tmp = path + ".tmp";
-                File.WriteAllText(tmp, text);
-                if (File.Exists(path)) File.Copy(path, path + ".bak", true);
-                if (File.Exists(path)) File.Delete(path);
-                File.Move(tmp, path);
+                // Flush file contents before the atomic rename, including transaction intent files.
+                using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    using (var writer = new StreamWriter(stream, new UTF8Encoding(false), 4096, leaveOpen: true))
+                        writer.Write(text);
+                    stream.Flush(flushToDisk: true);
+                }
+                // Replace the destination atomically. Deleting it before moving the temporary
+                // file leaves a crash window with no primary profile or transaction journal.
+                if (File.Exists(path)) File.Replace(tmp, path, path + ".bak");
+                else File.Move(tmp, path);
                 return true;
             }
             catch (Exception e) { Debug.LogError($"NetProfiles: writing {path} failed: {e.Message}"); return false; }

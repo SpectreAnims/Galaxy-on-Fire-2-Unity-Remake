@@ -267,6 +267,8 @@ namespace GoF2Remake.Multiplayer
                 return "Use a saleable item, 1–500 units, and a unit price from 1 to 1,000,000,000 credits.";
             record.listings ??= new List<PlayerStationListing>();
             if (record.listings.Count >= MaxStationListings) return "This station has reached its listing limit.";
+            NormalizeItemListingIds(record);
+            if (record.nextItemListingId >= int.MaxValue) return "The item listing ID limit has been reached.";
             string payoutFactionId = null;
             if (payFactionTreasury)
             {
@@ -285,10 +287,12 @@ namespace GoF2Remake.Multiplayer
             RemoveStorageLots(record, account, item, amount);
             stock.amount -= amount;
             if (stock.amount == 0) record.storage.Remove(stock);
-            record.listings.Add(new PlayerStationListing { item = item, amount = amount, unitPrice = unitPrice, sellerProfile = account, payoutFactionId = payoutFactionId });
+            int listingId = record.nextItemListingId++;
+            record.listings.Add(new PlayerStationListing { id = listingId, item = item, amount = amount, unitPrice = unitPrice, sellerProfile = account, payoutFactionId = payoutFactionId });
             if (!Save())
             {
                 record.listings.RemoveAt(record.listings.Count - 1);
+                record.nextItemListingId = listingId;
                 record.storageLots = previousLots;
                 if (stock.amount == 0) record.storage.Add(stock);
                 stock.amount += amount;
@@ -297,14 +301,73 @@ namespace GoF2Remake.Multiplayer
             return "Listing #" + (record.listings.Count - 1) + " created. " + amount + " units are held in marketplace escrow.";
         }
 
+        static void NormalizeItemListingIds(PlayerStationRecord station)
+        {
+            if (station?.listings == null) return;
+            int next = Math.Max(1, station.nextItemListingId);
+            foreach (var listing in station.listings)
+                if (listing != null && listing.id >= next) next = listing.id == int.MaxValue ? int.MaxValue : listing.id + 1;
+            var used = new HashSet<int>();
+            foreach (var listing in station.listings)
+            {
+                if (listing == null) continue;
+                if (listing.id > 0 && used.Add(listing.id)) continue;
+                if (next < int.MaxValue) { listing.id = next++; used.Add(listing.id); }
+                else listing.id = 0;
+            }
+            station.nextItemListingId = next;
+        }
+
+        internal static string BuyItemListingById(NetPlayer by, int stationId, int listingId, int amount, bool cancel)
+        {
+            var station = Find(stationId);
+            if (listingId <= 0) return "Choose an active item listing.";
+            int index = station?.listings?.FindIndex(listing => listing != null && listing.id == listingId) ?? -1;
+            if (index < 0) return "That listing is no longer available. Refresh the marketplace.";
+            return cancel ? CancelListing(by, stationId, index) : BuyListing(by, stationId, index, amount);
+        }
+
+        [Serializable] internal sealed class MarketUiRow
+        {
+            public int id, item, amount;
+            public long price;
+            public bool hull, mine;
+        }
+        [Serializable] internal sealed class MarketUiCatalogue
+        {
+            public int stationId, page, pageCount;
+            public List<MarketUiRow> rows = new List<MarketUiRow>();
+        }
+        internal static MarketUiCatalogue MarketCatalogueFor(NetPlayer pilot, int stationId, int page)
+        {
+            var result = new MarketUiCatalogue { stationId = stationId };
+            var station = Find(stationId);
+            if (!IsStationContext(pilot, station, out string account) || station.underConstruction) return result;
+            if (station.listings != null)
+                foreach (var listing in station.listings)
+                    if (listing != null && listing.id > 0 && listing.amount > 0)
+                        result.rows.Add(new MarketUiRow { id = listing.id, item = listing.item, amount = listing.amount,
+                            price = listing.unitPrice, mine = string.Equals(account, listing.sellerProfile, StringComparison.Ordinal) });
+            if (station.shipListings != null)
+                foreach (var listing in station.shipListings)
+                    if (listing?.hull != null && listing.id > 0)
+                        result.rows.Add(new MarketUiRow { id = listing.id, item = listing.hull.ship, amount = 1,
+                            price = listing.price, hull = true, mine = string.Equals(account, listing.sellerProfile, StringComparison.Ordinal) });
+            const int pageSize = 64;
+            result.pageCount = Math.Max(1, (result.rows.Count + pageSize - 1) / pageSize);
+            result.page = Math.Clamp(page, 0, result.pageCount - 1);
+            int start = result.page * pageSize;
+            result.rows = result.rows.GetRange(start, Math.Min(pageSize, result.rows.Count - start));
+            return result;
+        }
+
         internal static string BuyListing(NetPlayer by, int id, int listingIndex, int amount)
         {
             var record = Find(id);
             if (record == null) return "No player station with that id exists.";
             if (record.offeredForClaimUtc > 0) return "This facility is closed until the station is claimed.";
-            if (!NetGame.IsServer || by == null || !by.IsSpawned || !by.InHangar ||
-                by.Station != record.stationIndex || !NetProfiles.Enabled || !NetProfiles.Controls(by.OwnerClientId))
-                return "Dock at this station and use a controlled player profile to buy goods.";
+            if (!IsStationContext(by, record, out string buyer))
+                return "Dock at this station with visitor permission and use a controlled player profile to buy goods.";
             if (record.underConstruction) return "This station is not operational yet.";
             if (listingIndex < 0 || record.listings == null || listingIndex >= record.listings.Count)
                 return "No listing exists at that index.";
@@ -316,7 +379,6 @@ namespace GoF2Remake.Multiplayer
             if (amount < 1 || amount > 500 || amount > listing.amount)
                 return "Choose an amount between 1 and 500, up to the available listing stock.";
 
-            string buyer = NetProfiles.AccountOf(by.OwnerClientId);
             string seller = listing.sellerProfile;
             if (string.IsNullOrEmpty(buyer)) return "Your player profile is unavailable.";
             if (string.Equals(buyer, seller, StringComparison.Ordinal))
@@ -332,6 +394,10 @@ namespace GoF2Remake.Multiplayer
             int cargo = NetProfiles.CargoAmount(buyer, listing.item);
             if (cargo < 0 || (long)cargo + amount > int.MaxValue)
                 return "Your saved cargo could not accept this purchase.";
+            // Inventory limits are not the same as physical hold capacity.
+            // Validate before touching escrow, credits, or the station registry.
+            if (NetProfiles.WreckSalvageCargoRoom(by, buyer) < amount)
+                return "Your ship does not have enough free cargo space for this purchase.";
 
             bool removeListing = amount == listing.amount;
             if (removeListing) record.listings.RemoveAt(listingIndex);
@@ -385,10 +451,8 @@ namespace GoF2Remake.Multiplayer
             var record = Find(id);
             if (record == null) return "No player station with that id exists.";
             if (record.offeredForClaimUtc > 0) return "This facility is closed until the station is claimed.";
-            if (by == null || !by.IsSpawned || !by.InHangar || by.Station != record.stationIndex ||
-                !NetProfiles.Enabled || !NetProfiles.Controls(by.OwnerClientId))
-                return "Dock at this station using a controlled profile to cancel a listing.";
-            string account = NetProfiles.AccountOf(by.OwnerClientId);
+            if (!IsStationContext(by, record, out string account))
+                return "Dock at this station using an authorised controlled profile to cancel a listing.";
             if (listingIndex < 0 || record.listings == null || listingIndex >= record.listings.Count)
                 return "No listing exists at that index.";
             var listing = record.listings[listingIndex];

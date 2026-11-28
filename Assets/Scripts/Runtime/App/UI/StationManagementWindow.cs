@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GoF2Remake.Multiplayer;
+using GoF2Remake.Data;
 using GoF2Remake.World;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -14,7 +15,8 @@ namespace GoF2Remake.UI
     {
         readonly StationMenu menu;
         readonly StationLevel level;
-        readonly VisualElement safeArea, panel, stationList;
+        readonly VisualElement safeArea, panel;
+        readonly ScrollView stationList;
         readonly ScrollView body;
         readonly Label heading, feedback;
         readonly Button openButton, closeButton;
@@ -26,6 +28,14 @@ namespace GoF2Remake.UI
         int confirmRetirementId = -1;
         int confirmBuilderRelinquish = -1;
         float refresh;
+        float nextPlannerQuery;
+        HashSet<int> plannerOrbits;
+        bool plannerRequestPending;
+        StarMap plannerMap;
+        NetPlayerStations.MarketUiCatalogue marketCatalogue;
+        int marketPage;
+        float nextMarketQuery;
+        bool compact;
         float feedbackTime;
         float pressedAt = -10f;
 
@@ -33,8 +43,9 @@ namespace GoF2Remake.UI
         internal Button MenuButton => openButton;
         internal void FocusFirst() => closeButton.Focus();
         public VisualElement[] NavItems() => panel.Query<VisualElement>().ToList()
-            .Where(element => element is Button || element is DropdownField || element is TextField)
-            .ToArray();
+            .Where(element => element.ClassListContains("player-station-action") || element.ClassListContains("player-station-row") ||
+                element.ClassListContains("player-station-close") || element.ClassListContains("player-station-field"))
+            .Where(element => element.focusable).ToArray();
 
         public StationManagementWindow(StationMenu menu, StationLevel level, VisualElement root)
         {
@@ -72,14 +83,34 @@ namespace GoF2Remake.UI
             body = new ScrollView(ScrollViewMode.Vertical); body.AddToClassList("player-station-body");
             split.Add(body); panel.Add(split);
             feedback = new Label(); feedback.AddToClassList("player-station-feedback"); panel.Add(feedback);
-            NetChat.Added += OnChat;
+            panel.RegisterCallback<GeometryChangedEvent>(_ => ApplyResponsiveLayout());
+            panel.RegisterCallback<FocusInEvent>(evt =>
+            {
+                if (evt.target is VisualElement target)
+                {
+                    if (body.Contains(target)) body.ScrollTo(target);
+                    else if (stationList.Contains(target)) stationList.ScrollTo(target);
+                }
+            });
+
         }
 
         public void Dispose()
         {
-            NetChat.Added -= OnChat;
+            Close();
+
             openButton?.RemoveFromHierarchy();
             panel?.RemoveFromHierarchy();
+        }
+
+        void ApplyResponsiveLayout()
+        {
+            bool small = InputMode.Current == InputKind.Touch || panel.resolvedStyle.width < 850f;
+            if (compact == small) return;
+            compact = small;
+            panel.EnableInClassList("player-station-compact", small);
+            stationList.mode = small ? ScrollViewMode.Horizontal : ScrollViewMode.Vertical;
+            stationList.contentContainer.style.flexDirection = small ? FlexDirection.Row : FlexDirection.Column;
         }
 
         bool CanOpen => NetGame.Active && level?.Layout != null;
@@ -100,8 +131,11 @@ namespace GoF2Remake.UI
             openButton.style.display = CanOpen ? DisplayStyle.Flex : DisplayStyle.None;
             if (!CanOpen) { if (open) Close(); return; }
             if (!open) return;
+            ApplyResponsiveLayout();
+            if (Time.unscaledTime >= nextMarketQuery) RefreshMarketCatalogue();
+            if (Time.unscaledTime >= nextPlannerQuery && Modding.ModPlayerInfrastructure.Current.Enabled) RefreshPlannerLocations();
             if (feedbackTime > 0 && (feedbackTime -= Time.unscaledDeltaTime) <= 0) feedback.text = "";
-            if (Time.unscaledTime - pressedAt < 5f || TextFieldKeys.InTextField(panel.focusController?.focusedElement)) return;
+            if (StarMap.IsOpen || Time.unscaledTime - pressedAt < 5f || TextFieldKeys.InTextField(panel.focusController?.focusedElement)) return;
             if ((refresh -= Time.unscaledDeltaTime) <= 0)
             {
                 refresh = 2f;
@@ -118,7 +152,13 @@ namespace GoF2Remake.UI
             panel.BringToFront();
             open = true;
             refresh = 0;
+            plannerOrbits = null;
+            plannerRequestPending = false;
+            RefreshPlannerLocations();
             RebuildStationList();
+            marketPage = 0;
+            marketCatalogue = null;
+            RefreshMarketCatalogue();
             RebuildBody();
             if (InputMode.Current != InputKind.Touch && !InputMode.MousePointing) closeButton.Focus();
         }
@@ -128,9 +168,14 @@ namespace GoF2Remake.UI
             if (!open) return;
             panel.style.display = DisplayStyle.None;
             open = false;
+            if (plannerMap != null && StarMap.Current == plannerMap) plannerMap.CloseBuilder();
+            plannerMap = null;
             confirmRetirementId = -1;
             confirmOrbitalRemoval = 0;
             drafts.Clear();
+            plannerOrbits = null;
+            plannerRequestPending = false;
+            marketCatalogue = null;
             confirmBuilderRelinquish = -1;
         }
 
@@ -168,13 +213,19 @@ namespace GoF2Remake.UI
             int previousId = selected?.id ?? -1;
             selected = records.FirstOrDefault(x => x.id == previousId)
                 ?? records.FirstOrDefault(x => x.stationIndex == level.Layout.stationIndex) ?? records[0];
-            if (previousId != selected.id) RebuildBody();
+            if (previousId != selected.id) drafts.Clear();
         }
 
         void SelectStation(PlayerStationRecord record)
         {
             if (selected?.id != record.id)
             {
+                confirmRetirementId = -1;
+                confirmBuilderRelinquish = -1;
+                confirmOrbitalRemoval = 0;
+                marketCatalogue = null;
+                marketPage = 0;
+                nextMarketQuery = 0;
                 drafts.Clear();
                 body.scrollOffset = Vector2.zero;
             }
@@ -230,8 +281,8 @@ namespace GoF2Remake.UI
                     : "Deposits are personal contributions. Individually owned stations do not draw from faction funds.");
                 AddAction("View construction contribution ledger", "/station contributions " + selected.id);
                 AddAction("View ownership transfer status", "/station transfer-status " + selected.id);
-                AddField("transferKind", "Transfer recipient type (player/faction)", "player");
-                AddField("transferAccount", "Recipient profile account ID", "");
+                AddChoice("transferKind", "Transfer recipient type", new List<(string, string)> { ("player", "Individual pilot"), ("faction", "Pilot’s faction") });
+                AddAccountField("transferAccount", "Recipient pilot");
                 AddAction("Propose ownership transfer", () => Send("/station transfer " + selected.id + " " + Value("transferKind") + " " + Value("transferAccount")));
                 AddAction("Accept pending transfer", "/station transfer-accept " + selected.id);
                 AddAction("Cancel pending transfer", "/station transfer-cancel " + selected.id);
@@ -289,9 +340,7 @@ namespace GoF2Remake.UI
                 AddField("marketHullPrice", "Hull price in credits", "");
                 AddAction("List hull for sale", () => Send("/station list-ship " + selected.id + " " +
                     Value("marketFleetIndex") + " " + Value("marketHullPrice")));
-                AddField("marketShipListing", "Ship listing number", "1");
-                AddAction("Buy listed hull", () => Send("/station buy-ship " + selected.id + " " + Value("marketShipListing")));
-                AddAction("Cancel my hull listing", () => Send("/station delist-ship " + selected.id + " " + Value("marketShipListing")));
+
                 if (NetPlayer.Local?.CanUseStationStockInUi == true) BuildStationStock();
                 BuildStationGovernance(selected);
             }
@@ -463,10 +512,7 @@ namespace GoF2Remake.UI
             AddField("marketPrice", "Price per unit (credits)", "100");
             AddField("marketPayout", "Listing proceeds (personal/faction)", "personal");
             AddAction("Create listing", () => Send("/station list-item " + id + " " + Value("marketItem") + " " + Value("marketAmount") + " " + Value("marketPrice") + " " + Value("marketPayout")));
-            AddField("listingIndex", "Listing index", "0");
-            AddField("buyAmount", "Purchase amount", "1");
-            AddAction("Buy listing", () => Send("/station buy " + id + " " + Value("listingIndex") + " " + Value("buyAmount")));
-            AddAction("Cancel your listing", () => Send("/station delist " + id + " " + Value("listingIndex")));
+            BuildMarketCatalogue(id);
             BuildConstructionProcurement(id, NetPlayer.Local?.CanFundStationProjectInUi(selected.id) == true, canManageModule: true);
 
 
@@ -583,8 +629,8 @@ namespace GoF2Remake.UI
                     AddField(modeKey, "Access · everyone, faction, blacklist or owner", access);
                     AddAction("Set gate access · orbit " + orbitId, () =>
                         Send("/station jumpgate-access " + orbitId + " " + Value(modeKey)));
-                    AddField(typeKey, "Blacklist entry type · player or faction", "player");
-                    AddField(targetKey, "Blacklist account or faction ID", "");
+                    AddChoice(typeKey, "Blacklist entry type", new List<(string, string)> { ("player", "Pilot"), ("faction", "Pilot’s faction") });
+                    AddAccountField(targetKey, "Blacklist target");
                     AddAction("Add to gate blacklist", () =>
                         Send("/station jumpgate-blacklist " + orbitId + " add " + Value(typeKey) + " " + Value(targetKey)));
                     AddAction("Remove from gate blacklist", () =>
@@ -657,9 +703,28 @@ namespace GoF2Remake.UI
             body.Add(field);
         }
 
-        static List<(string value, string label)> StationModelChoices() =>
-            NetGame.Db.Stations.Where(station => station != null && NetPlayerStations.IsStationModelPreset(station.index))
-                .OrderBy(station => station.name).Select(station => (station.index.ToString(), station.name + " [" + station.index + "]")).ToList();
+        static List<(string value, string label)> StationModelChoices()
+        {
+            var db = NetGame.Db;
+            var models = db.Stations.Where(station => station != null && NetPlayerStations.IsStationModelPreset(station.index))
+                .Select(station => (station, race: db.Systems.Find(system => system != null && system.index == station.system)?.raceId ?? -1))
+                .OrderBy(entry => entry.race).ThenBy(entry => entry.station.index);
+            var result = new List<(string, string)>();
+            var counts = new Dictionary<int, int>();
+            var assemblies = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var entry in models)
+            {
+                string assembly = OrbitBuilder.StationPresetAssembly(db, entry.station);
+                if (string.IsNullOrEmpty(assembly)) continue;
+                // Identical stock models are shown once per race; distinct custom presets retain their identities.
+                if (!Modding.ModWorld.IsModStation(entry.station.index) && Modding.ModWorld.ModelOf(entry.station.index) == null &&
+                    !assemblies.Add(entry.race + ":" + assembly)) continue;
+                counts.TryGetValue(entry.race, out int number); counts[entry.race] = ++number;
+                string race = entry.race >= 0 ? GoF2Remake.Flight.Standing.RaceName(entry.race) : "Unassigned";
+                result.Add((entry.station.index.ToString(), $"{race} {number} · {entry.station.name} [#{entry.station.index}]"));
+            }
+            return result;
+        }
 
         static List<(string value, string label)> GateModelChoices() =>
             NetPlayerStations.JumpgateModelChoices().Select(model => (model.id.ToString(), model.label)).ToList();
@@ -676,17 +741,92 @@ namespace GoF2Remake.UI
                 Send("/station contribute " + Value("sharedProject") + " " + Value("sharedMaterial") + " " + Value("sharedAmount")));
         }
 
+        void RefreshPlannerLocations()
+        {
+            nextPlannerQuery = Time.unscaledTime + 8f;
+            plannerRequestPending = true;
+            if (NetPlayer.Local?.RequestStationPlannerLocations(orbits =>
+            {
+                if (!open) return;
+                plannerRequestPending = false;
+                var updated = new HashSet<int>(orbits);
+                if (plannerOrbits == null || !plannerOrbits.SetEquals(updated)) refresh = 0;
+                plannerOrbits = updated;
+            }) != true) plannerRequestPending = false;
+        }
+
         void BuildNewStationControls()
         {
             AddSection("BUILD A STATION", "");
-            var systems = NetGame.Db.Systems.Where(system => system != null && system.stations?.Count > 0)
+            var db = NetGame.Db;
+            if (db?.Systems == null) return;
+            if (plannerOrbits == null)
+            {
+                AddInfo("Build location", plannerRequestPending ? "Waiting for server-approved construction locations…" : "Construction locations are unavailable.");
+                return;
+            }
+            bool Available(int orbit) => plannerOrbits?.Contains(orbit) == true && NetPlayerStations.CanBuildStationInOrbit(orbit);
+            var systems = db.Systems.Where(system => system != null && system.stations?.Any(Available) == true)
                 .OrderBy(system => system.name).Select(system => (system.index.ToString(), system.name)).ToList();
-            AddChoice("system", "Build system", systems);
-            AddChoice("newStationModel", "Station model", StationModelChoices());
+            if (systems.Count == 0) AddInfo("Build location", "No reachable discovered system has a vacant orbit.");
+            else
+            {
+                var choices = new List<(string value, string label)> { ("", "Select a system") };
+                choices.AddRange(systems);
+                AddChoice("system", "Reachable build system", choices, _ => { drafts.Remove("buildOrbit"); RebuildBody(); });
+                var orbitChoices = new List<(string value, string label)> { ("", "Select a vacant orbit") };
+                if (int.TryParse(Value("system"), out int chosenSystem))
+                    orbitChoices.AddRange(db.Stations.Where(station => station != null && station.system == chosenSystem && Available(station.index))
+                        .OrderBy(station => station.name).Select(station => (station.index.ToString(), station.name)));
+                AddChoice("buildOrbit", "Vacant orbit", orbitChoices);
+                AddAction("Choose system and orbit on star map", () =>
+                {
+                    if (StarMap.IsOpen) return;
+                    var allowed = new HashSet<int>(systems.Select(system => int.Parse(system.Item1)));
+                    panel.style.display = DisplayStyle.None;
+                    var map = StarMap.OpenStationPlanner(db, allowed.Contains, Available, result =>
+                    {
+                        plannerMap = null;
+                        if (!open) return;
+                        panel.style.display = DisplayStyle.Flex;
+                        var picked = db.Stations.Find(station => station != null && station.index == result.station);
+                        if (picked != null && allowed.Contains(picked.system) && Available(picked.index))
+                        { drafts["system"] = picked.system.ToString(); drafts["buildOrbit"] = picked.index.ToString(); }
+                        RebuildBody();
+                    });
+                    plannerMap = map;
+                    if (map == null) { panel.style.display = DisplayStyle.Flex; feedback.text = "The star map could not be opened."; feedbackTime = 8f; }
+                    else map.SetHelp("Select a reachable system, then a vacant orbit. Occupied or reserved orbits cannot be confirmed.");
+                });
+                AddInfo("Orbit placement", "The selected planet keeps its orbit. Construction reserves its vacant station site.");
+            }
+            var modelPreview = new VisualElement();
+            modelPreview.style.height = 120; modelPreview.style.width = 200;
+            modelPreview.style.alignSelf = Align.Center;
+            var modelImageLabel = new Label();
+            modelImageLabel.AddToClassList("player-station-note");
+            void Preview(string model)
+            {
+                if (!int.TryParse(model, out int index)) return;
+                var image = Modding.ModPlayerInfrastructure.StationModelImage(index);
+                modelPreview.style.backgroundImage = image.texture != null ? new StyleBackground(image.texture) : StyleKeyword.None;
+                modelPreview.style.display = image.texture != null ? DisplayStyle.Flex : DisplayStyle.None;
+                modelImageLabel.text = string.IsNullOrEmpty(image.id) ? "No thumbnail assigned for this model." : "Image ID: " + image.id;
+            }
+            AddChoice("newStationModel", "Station model", StationModelChoices(), Preview);
+            Preview(Value("newStationModel"));
+            body.Add(modelPreview); body.Add(modelImageLabel);
             AddField("newStationName", "Station name", "");
-            if (!string.IsNullOrEmpty(Value("newStationModel")))
+            if (systems.Count > 0 && !string.IsNullOrEmpty(Value("newStationModel")))
                 AddAction("Start station project", () =>
-                    SendStationName("start-model " + Value("system") + " " + Value("newStationModel"), Value("newStationName")));
+                {
+                    if (!int.TryParse(Value("system"), out int systemId) || !systems.Any(system => system.Item1 == systemId.ToString()))
+                    { feedback.text = "Select a discovered build system first."; feedbackTime = 8f; return; }
+                    if (!int.TryParse(Value("buildOrbit"), out int orbit) || !Available(orbit) ||
+                        db.Stations.Find(station => station != null && station.index == orbit)?.system != systemId)
+                    { feedback.text = "Select a vacant orbit first."; feedbackTime = 8f; return; }
+                    SendStationName("start-orbit " + systemId + " " + orbit + " " + Value("newStationModel"), Value("newStationName"));
+                });
         }
 
         void BuildStationConstruction(PlayerStationRecord project)
@@ -702,10 +842,13 @@ namespace GoF2Remake.UI
                 AddInfo("Deliveries", "Fly within 5 km of the reconstruction site and open Multiplayer → Orbit Projects.");
             else
             {
-                AddField("contributeItem", "Material item ID", project.materials?.Find(material =>
-                    material != null && material.required > material.delivered)?.item.ToString() ?? "");
-                AddField("contributeAmount", "Amount", "10");
-                AddAction("Deliver construction cargo", () =>
+                var remaining = project.materials?.Where(material => material != null && material.required > material.delivered)
+                    .Select(material => (material.item.ToString(), (NetGame.Db.Item(material.item)?.name ?? "Item " + material.item) +
+                        " · " + (material.required - material.delivered).ToString("N0") + " remaining")).ToList()
+                    ?? new List<(string, string)>();
+                AddChoice("contributeItem", "Required material", remaining);
+                AddField("contributeAmount", "Units", "10");
+                if (remaining.Count > 0) AddAction("Deliver construction cargo", () =>
                     Send("/station contribute " + id + " " + Value("contributeItem") + " " + Value("contributeAmount")));
             }
             AddAction("View contribution ledger", "/station contributions " + id);
@@ -717,11 +860,59 @@ namespace GoF2Remake.UI
         {
             AddSection("MARKETPLACE", "");
             AddAction("View item and hull listings", "/station market " + id);
-            AddField("visitorListing", "Item listing number", "");
-            AddField("visitorQuantity", "Units", "1");
-            AddAction("Buy listed items", () => Send("/station buy " + id + " " + Value("visitorListing") + " " + Value("visitorQuantity")));
-            AddField("visitorHull", "Hull listing number", "");
-            AddAction("Buy listed hull", () => Send("/station buy-ship " + id + " " + Value("visitorHull")));
+            BuildMarketCatalogue(id);
+        }
+
+        void RefreshMarketCatalogue()
+        {
+            nextMarketQuery = Time.unscaledTime + 8f;
+            if (selected == null || selected.underConstruction || selected.stationIndex != level.Layout.stationIndex ||
+                selected.offeredForClaimUtc > 0) return;
+            int stationId = selected.id;
+            NetPlayer.Local?.RequestStationMarket(stationId, marketPage, catalogue =>
+            {
+                if (!open || selected?.id != stationId || catalogue == null) return;
+                marketCatalogue = catalogue;
+                marketPage = catalogue.page;
+                refresh = 0;
+            });
+        }
+
+        void BuildMarketCatalogue(string id)
+        {
+            if (marketCatalogue == null || marketCatalogue.stationId.ToString() != id)
+            {
+                AddInfo("Listings", "Waiting for the server marketplace catalogue…");
+                AddAction("Refresh listings", RefreshMarketCatalogue);
+                return;
+            }
+            var entries = marketCatalogue.rows ?? new List<NetPlayerStations.MarketUiRow>();
+            if (entries.Count == 0) { AddInfo("Listings", "No available listings."); return; }
+            if (marketCatalogue.pageCount > 1)
+            {
+                AddInfo("Marketplace page", (marketPage + 1) + " / " + marketCatalogue.pageCount);
+                if (marketPage > 0) AddAction("Previous page", () => { marketPage--; drafts.Remove("marketSelection"); RefreshMarketCatalogue(); });
+                if (marketPage + 1 < marketCatalogue.pageCount) AddAction("Next page", () => { marketPage++; drafts.Remove("marketSelection"); RefreshMarketCatalogue(); });
+            }
+            string Key(NetPlayerStations.MarketUiRow entry) => (entry.hull ? "h" : "i") + entry.id;
+            var choices = new List<(string value, string label)> { ("", "Select a listing") };
+            foreach (var entry in entries)
+            {
+                string name = entry.hull ? NetGame.Db.Ship(entry.item)?.name : NetGame.Db.Item(entry.item)?.name;
+                choices.Add((Key(entry), (name ?? "Unknown") + " · " + entry.amount + " × " + entry.price.ToString("N0") + " cr" + (entry.mine ? " (yours)" : "") + " [" + Key(entry) + "]"));
+            }
+            AddChoice("marketSelection", "Listing", choices, _ => RebuildBody());
+            var chosen = entries.Find(entry => Key(entry) == Value("marketSelection"));
+            if (chosen == null) return;
+            if (chosen.mine)
+                AddAction("Cancel my listing", () => Send("/station " + (chosen.hull ? "delist-ship" : "cancel-listing") + " " + id + " " + chosen.id));
+            else if (chosen.hull)
+                AddAction("Buy selected hull", () => Send("/station buy-ship " + id + " " + chosen.id));
+            else
+            {
+                AddField("marketBuyQuantity", "Units (up to " + chosen.amount + ")", "1");
+                AddAction("Buy selected goods", () => Send("/station buy-listing " + id + " " + chosen.id + " " + Value("marketBuyQuantity")));
+            }
         }
 
         void BuildVisitorStorage(string id)
@@ -750,7 +941,7 @@ namespace GoF2Remake.UI
             AddChoice("stationAppearance", "Station model", StationModelChoices());
             AddAction("Change station model", () => Send("/station appearance " + id + " " + Value("stationAppearance")));
             AddAction("View station history", "/station history " + id);
-            AddField("governanceAccount", "Profile account ID", "");
+            AddAccountField("governanceAccount", "Target pilot");
             AddChoice("governanceRole", "Station role", Enum.GetNames(typeof(PlayerStationRole))
                 .Append("none").Select(value => (value, value)).ToList());
             AddAction("Set station role", () => Send("/station role " + id + " " + Value("governanceAccount") + " " + Value("governanceRole")));
@@ -793,6 +984,24 @@ namespace GoF2Remake.UI
                 }
                 else AddAction("Relinquish builder rights", () => { confirmBuilderRelinquish = station.id; RebuildBody(); });
             }
+        }
+
+        void AddAccountField(string key, string label)
+        {
+            AddField(key, label + " (or offline account/faction reference)", "");
+            var pilots = NetPlayer.All.Where(pilot => pilot != null && pilot.IsSpawned && !pilot.Observer)
+                .OrderBy(pilot => pilot.DisplayName).ToList();
+            if (pilots.Count == 0) return;
+            var labels = new List<string> { "Select an online pilot…" };
+            labels.AddRange(pilots.Select(pilot => pilot.TaggedName + " [#" + pilot.OwnerClientId + "]"));
+            var picker = new DropdownField(label, labels, 0);
+            picker.AddToClassList("player-station-field");
+            picker.RegisterValueChangedCallback(_ =>
+            {
+                if (picker.index > 0 && picker.index <= pilots.Count)
+                    fields[key].value = "online:" + pilots[picker.index - 1].OwnerClientId;
+            });
+            body.Add(picker);
         }
 
         void AddField(string key, string label, string initial)
@@ -841,17 +1050,21 @@ namespace GoF2Remake.UI
 
         void Dispatch(string command)
         {
-            NetPanel.Command(command.TrimEnd());
             feedback.text = "Request sent. The server response will appear here.";
             feedbackTime = 8f;
-        }
-
-        void OnChat(NetChat.Message message)
-        {
-            if (!open || feedbackTime <= 0 || message == null || message.channel != NetChat.Channel.Notice) return;
-            feedback.text = message.text;
-            feedbackTime = 8f;
-            refresh = 0;
+            if (NetPlayer.Local?.RequestStationUiCommand(command.TrimEnd(), result =>
+            {
+                if (!open) return;
+                feedback.text = string.IsNullOrEmpty(result) ? "Request completed." : result;
+                feedbackTime = 12f;
+                refresh = 0;
+                nextPlannerQuery = 0;
+                nextMarketQuery = 0;
+            }) != true)
+            {
+                feedback.text = "A station request is already pending, or the server is unavailable.";
+                feedbackTime = 8f;
+            }
         }
 
         static string ModuleLabel(string id)

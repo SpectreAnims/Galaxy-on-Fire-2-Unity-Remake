@@ -43,6 +43,8 @@ namespace GoF2Remake.Multiplayer
             // Legacy single-profile field: retained so an interrupted journal from the first version can recover.
             public string account;
             public string registryJson;
+            // Durable completion marker; old journals deserialize as unfinished.
+            public bool completed;
             public List<StationCargoTarget> cargo = new List<StationCargoTarget>();
             public List<StationCreditTarget> credits = new List<StationCreditTarget>();
             public List<StationFactionBankTarget> factionBanks = new List<StationFactionBankTarget>();
@@ -50,6 +52,11 @@ namespace GoF2Remake.Multiplayer
         }
 
         static string TransactionPath => path == null ? null : path + ".transaction";
+
+        // Fail closed while absolute journal targets may still be replayed. Profile uploads
+        // cannot safely replace a durable target until recovery has completed.
+        internal static bool ProfileWritesBlocked => NetGame.IsServer &&
+            !string.IsNullOrEmpty(TransactionPath) && File.Exists(TransactionPath);
 
         /// <summary>Apply a committed profile-credit delta to its online controller's live game.</summary>
         internal static void NotifyProfileCreditChange(string account, long delta, string reason)
@@ -60,16 +67,18 @@ namespace GoF2Remake.Multiplayer
                 if (!NetProfiles.Controls(client)) continue;
                 // The host profile was updated directly by NetProfiles.SetCreditsAmount.
                 if (NetGame.PersistentHost && client == NetGame.LocalId) break;
-                long remaining = delta;
-                while (remaining != 0)
-                {
-                    int part = remaining > int.MaxValue ? int.MaxValue :
-                        remaining < int.MinValue ? int.MinValue : (int)remaining;
-                    NetState.Instance?.SendAdmin(client, NetAdmin.Order.Credits, part, 0, 0, "", reason ?? "Station transaction");
-                    remaining -= part;
-                }
+                NetState.Instance?.SendStationCreditDelta(client, delta, reason ?? "Station transaction");
                 break;
             }
+        }
+
+        // Positive amount deposits into the faction, negative amount withdraws.
+        internal static bool CommitFactionBankTransfer(string account, string factionId, long amount)
+        {
+            if (amount == 0 || amount == long.MinValue || ProfileWritesBlocked) return false;
+            return CommitProfileTransaction(null,
+                new List<(string account, long delta)> { (account, -amount) },
+                new List<(string factionId, long delta)> { (factionId, amount) });
         }
 
         internal static bool CommitCargoTransaction(string account, params (int item, int delta)[] changes)
@@ -199,8 +208,21 @@ namespace GoF2Remake.Multiplayer
                 journal.storedShips.Add(new StationShipTarget { account = target.Key, ships = target.Value });
 
             if (!NetProfiles.Write(TransactionPath, JsonUtility.ToJson(journal, true))) return false;
-            if (!FinishTransaction(journal))
-                Debug.LogWarning("NetPlayerStations: station transaction is journalled and will be retried during recovery.");
+            var affectedAccounts = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var target in journal.cargo) affectedAccounts.Add(target.account);
+            foreach (var target in journal.credits) affectedAccounts.Add(target.account);
+            foreach (var target in journal.storedShips) affectedAccounts.Add(target.account);
+            foreach (string account in affectedAccounts) NetProfiles.InvalidateEconomyUploads(account);
+            try
+            {
+                if (!FinishTransaction(journal, preserveLiveRegistry: true))
+                    Debug.LogWarning("NetPlayerStations: station transaction is journalled and will be retried during recovery.");
+            }
+            catch (Exception e)
+            {
+                // The journal is already durable. An exception must not trigger a caller's rollback/refund.
+                Debug.LogError($"NetPlayerStations: committed station transaction requires recovery ({e.Message}).");
+            }
             return true; // A durable journal commits the intent; callers must not compensate it.
         }
 
@@ -233,36 +255,74 @@ namespace GoF2Remake.Multiplayer
             }
         }
 
-        static bool FinishTransaction(StationTransactionJournal journal)
+        static bool FinishTransaction(StationTransactionJournal journal, bool preserveLiveRegistry = false)
         {
-            foreach (var target in journal.cargo)
-                if (target == null || !NetProfiles.SetCargoAmount(target.account, target.item, target.amount))
-                    return false;
-            foreach (var target in journal.credits)
-                if (target == null || !NetProfiles.SetCreditsAmount(target.account, target.amount))
-                    return false;
+            if (journal.completed) return CleanupCompletedJournal();
+            // Validate the registry before changing any participant's durable balance.
+            var recovered = JsonUtility.FromJson<Registry>(journal.registryJson);
+            if (recovered == null || recovered.stations == null || recovered.jumpgates == null) return false;
+            var bankTargets = new Dictionary<string, long>(StringComparer.Ordinal);
             foreach (var target in journal.factionBanks)
-                if (target == null || !NetFactions.SetBankAmount(target.factionId, target.amount))
-                    return false;
+            {
+                if (target == null || string.IsNullOrEmpty(target.factionId) || target.amount < 0 ||
+                    NetFactions.BankAmount(target.factionId) < 0 || bankTargets.ContainsKey(target.factionId)) return false;
+                bankTargets.Add(target.factionId, target.amount);
+            }
+            var accounts = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var target in journal.cargo)
+            {
+                if (target == null || string.IsNullOrEmpty(target.account)) return false;
+                accounts.Add(target.account);
+            }
+            foreach (var target in journal.credits)
+            {
+                if (target == null || string.IsNullOrEmpty(target.account)) return false;
+                accounts.Add(target.account);
+            }
             foreach (var target in journal.storedShips)
-                if (target == null || string.IsNullOrEmpty(target.account) || target.ships == null ||
-                    !NetProfiles.SetStoredShips(target.account, target.ships))
-                    return false;
+            {
+                if (target == null || string.IsNullOrEmpty(target.account) || target.ships == null) return false;
+                accounts.Add(target.account);
+            }
+            foreach (var account in accounts)
+            {
+                var cargo = new Dictionary<int, int>();
+                long? credits = null;
+                List<StoredShip> ships = null;
+                foreach (var target in journal.cargo)
+                    if (target.account == account) cargo[target.item] = target.amount;
+                foreach (var target in journal.credits)
+                    if (target.account == account) credits = target.amount;
+                foreach (var target in journal.storedShips)
+                    if (target.account == account) ships = target.ships;
+                if (!NetProfiles.ApplyStationProfileTargets(account, cargo, credits, ships)) return false;
+            }
+            if (!NetFactions.SetBankAmounts(bankTargets)) return false;
 
             if (!NetProfiles.Write(path, journal.registryJson)) return false;
-            registry = JsonUtility.FromJson<Registry>(journal.registryJson);
-            if (registry == null) return false;
-            registry.stations ??= new List<PlayerStationRecord>();
+            // A normal synchronous commit already has exactly this state in memory. Keep
+            // object identity for callers; only recovery must replace the live registry.
+            if (!preserveLiveRegistry) registry = recovered;
+            // Record completion before attempting deletion. A cleanup failure must never
+            // cause already committed absolute targets to be applied a second time.
+            journal.completed = true;
+            if (!NetProfiles.Write(TransactionPath, JsonUtility.ToJson(journal, true))) return false;
+            NetState.Instance?.PublishPlayerStations(Snapshot);
+            return CleanupCompletedJournal();
+        }
+
+        static bool CleanupCompletedJournal()
+        {
             try
             {
                 if (File.Exists(TransactionPath)) File.Delete(TransactionPath);
+                return true;
             }
             catch (Exception e)
             {
                 Debug.LogWarning($"NetPlayerStations: committed transaction journal cleanup deferred ({e.Message}).");
+                return false;
             }
-            NetState.Instance?.PublishPlayerStations(Snapshot);
-            return true;
         }
     }
 }

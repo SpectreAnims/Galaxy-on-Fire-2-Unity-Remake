@@ -142,6 +142,16 @@ namespace GoF2Remake.UI
         {
             int station = planets[k].station;
             if (builder != null) { builder.stationPicked?.Invoke(station); return; }
+            if (constructionSystemAllowed != null)
+            {
+                int constructionSystem = SystemOf(station);
+                if (!constructionSystemAllowed(constructionSystem) || constructionOrbitAllowed?.Invoke(station) != true)
+                { ShowDialog("This orbit is occupied, reserved or inaccessible.", null, null, true); return; }
+                string systemName = db.Systems.Find(system => system != null && system.index == constructionSystem)?.name ?? "this system";
+                ShowDialog("Reserve the vacant orbit of " + StationName(station, false) + " in " + systemName + " for a station project?",
+                    () => Close(new StarMapResult { station = station }), null);
+                return;
+            }
             if (mode == StarMapMode.Mission && !travel) { ShowDialog(StationName(station), null, null, true); return; }   // view only
             if (station == currentStation) { ShowDialog(T(419), null, null, true); return; }
             // Modified: StarMap::OnTouchEnd's campaign checks for the target station (the cabins of 91 / 94, step 142's plasma

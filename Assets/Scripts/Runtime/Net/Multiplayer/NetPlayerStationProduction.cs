@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using GoF2Remake.Data;
+using UnityEngine;
 
 namespace GoF2Remake.Multiplayer
 {
@@ -40,7 +41,8 @@ namespace GoF2Remake.Multiplayer
                 stationId = record.id,
                 stationName = record.name,
                 installed = installed,
-                operational = installed && !record.underConstruction,
+                operational = installed && !record.underConstruction && !record.destroyed && !record.retired &&
+                    !record.wreckClaimOpen && !StationClosedByCombat(record.stationIndex),
                 building = building,
                 storedHulls = NetGame.IsServer ? (record.dryDockShips?.Count ?? 0) : record.visibleDryDockHullCount,
                 hullCapacity = MaxDryDockShipsPerStation,
@@ -112,10 +114,26 @@ namespace GoF2Remake.Multiplayer
             return false;
         }
 
+        // UTC timestamps remain the authority for persistent state. Realtime only throttles scans.
+        static float nextSlowStationTick;
+        static float nextWreckClaimTick;
+
         /// <summary>Called by the authoritative server update loop; due jobs survive restarts via UTC timestamps.</summary>
         internal static void Tick()
         {
             if (!NetGame.IsServer || !sessionActive) return;
+            float realtime = Time.realtimeSinceStartup;
+            // Wreck claims need responsive progress updates; production, permissions, maintenance
+            // and construction do not need to be inspected every rendered frame.
+            // Do not mutate wreck claims ahead of an unfinished durable transaction.
+            if (registry?.stations != null && !persistenceFaulted &&
+                realtime >= nextWreckClaimTick && !File.Exists(TransactionPath))
+            {
+                nextWreckClaimTick = realtime + 0.125f; // 8 Hz
+                TickWreckClaims();
+            }
+            if (realtime < nextSlowStationTick) return;
+            nextSlowStationTick = realtime + 1f; // 1 Hz
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             // A durable write-ahead journal is the transaction's commit point. If a profile or
             // registry write temporarily fails after the journal is created, retry it during the
@@ -127,21 +145,24 @@ namespace GoF2Remake.Multiplayer
                 if (recovered && !pending) persistenceFaulted = false;
                 nextTransactionRetryUtc = pending ? now + 5 : 0;
             }
-            if (registry?.stations == null) return;
+            // Never advance another persistent lifecycle over an unfinished journal.
+            if (persistenceFaulted || ProfileWritesBlocked || registry?.stations == null) return;
             PublishStationManagementAccess();
             TickJumpgates(); // fixed-destination gate projects share the persistent UTC construction lifecycle.
             if (registry?.stations == null) return;
             TickStationDestruction();
             if (registry?.stations == null) return;
             TickOrbitalStructures(now);
-            if (registry?.stations == null) return;
-            TickWreckClaims();
             if (registry?.stations == null) return; // a failed station save can disable the registry
             TickFactoryJobs(now);
-            if (now < nextDryDockRetryUtc) return;
-            foreach (var record in registry.stations)
+            if (now < nextDryDockRetryUtc || registry?.stations == null || persistenceFaulted || ProfileWritesBlocked) return;
+            var dryDockRegistry = registry;
+            foreach (var record in dryDockRegistry.stations)
+            {
+                if (!ReferenceEquals(registry, dryDockRegistry)) return;
                 if (record != null && record.offeredForClaimUtc == 0 && record.dryDockBuilding && record.dryDockCompletesUtc <= now)
                     if (!CompleteDryDockJob(record, now)) nextDryDockRetryUtc = now + 5;
+            }
         }
 
         /// <summary>List ship blueprints that this station's dry dock can construct.</summary>
@@ -184,7 +205,9 @@ namespace GoF2Remake.Multiplayer
             if (record.underConstruction) return "Finish station construction before building ships.";
             if (!(record.addons?.Exists(a => a != null && a.kind == "drydock" && a.level > 0) ?? false))
                 return "Install a dry dock module first.";
+            var originalRegistry = registry;
             CompleteDryDockJob(record, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            if (!ReferenceEquals(registry, originalRegistry)) return "Station recovery completed; retry the dry dock request.";
             if (record.dryDockBuilding)
                 return "The dry dock is already constructing " + (NetGame.Db?.Ship(record.dryDockShip)?.name ?? "a ship") +
                     "; remaining seconds: " + Math.Max(0L, record.dryDockCompletesUtc - DateTimeOffset.UtcNow.ToUnixTimeSeconds()) + ".";
@@ -260,7 +283,7 @@ namespace GoF2Remake.Multiplayer
                 record.storage = previousStorage;
                 record.storageLots = previousLots;
                 ClearDryDockJob(record);
-                if (consumeBlueprint) registry?.consumedBlueprints?.Remove(productId);
+                if (consumeBlueprint && ReferenceEquals(registry, originalRegistry)) registry.consumedBlueprints?.Remove(productId);
                 return "The dry-dock job could not be saved; all materials and the blueprint were restored.";
             }
             if (consumeBlueprint) GoF2Remake.Data.Session.UnlockedBlueprints.Remove(productId);
@@ -528,17 +551,25 @@ namespace GoF2Remake.Multiplayer
 
         static void TickFactoryJobs(long now)
         {
-            if (registry?.stations == null) return;
-            foreach (var record in registry.stations)
+            var original = registry;
+            if (original?.stations == null) return;
+            foreach (var record in original.stations)
             {
-                if (record == null || record.offeredForClaimUtc > 0 || !HasFactoryModule(record) || record.underConstruction) continue;
+                if (!ReferenceEquals(registry, original)) return;
+                if (record == null || record.offeredForClaimUtc > 0 || !HasFactoryModule(record) || record.underConstruction ||
+                    StationClosedByCombat(record.stationIndex) || record.retired) continue;
                 record.storage ??= new List<PlayerStationStorage>();
                 record.factoryJobs ??= new List<PlayerFactoryProductionJob>();
                 record.factoryRepeatOrders ??= new List<PlayerFactoryRepeatOrder>();
                 if (record.factoryJobs.Count > 0)
                 {
                     var job = record.factoryJobs[0];
-                    if (job == null) { record.factoryJobs.RemoveAt(0); Save(); continue; }
+                    if (job == null)
+                    {
+                        record.factoryJobs.RemoveAt(0);
+                        if (!Save()) { record.factoryJobs.Insert(0, null); return; }
+                        continue;
+                    }
                     if (job.completesUtc > now) continue;
                     EnsureStorageLots(record);
                     var output = record.storage.Find(x => x != null && x.item == job.outputItem);
@@ -583,7 +614,7 @@ namespace GoF2Remake.Multiplayer
                 }
 
                 if (record.factoryJobs.Count != 0) continue;
-                bool resumed = false;
+                List<PlayerFactoryRepeatOrder> resumed = null;
                 foreach (var paused in record.factoryRepeatOrders)
                 {
                     if (paused == null || !paused.paused) continue;
@@ -611,21 +642,42 @@ namespace GoF2Remake.Multiplayer
                         (pausedOutput != null && pausedOutput.amount > int.MaxValue - produced) ||
                         storedNow - consumed + produced > StorageCapacity(record))
                         hasInputs = false;
-                    if (hasInputs) { paused.paused = false; resumed = true; }
+                    if (hasInputs)
+                    {
+                        paused.paused = false;
+                        (resumed ??= new List<PlayerFactoryRepeatOrder>()).Add(paused);
+                    }
                 }
-                if (resumed) Save();
+                if (resumed != null && !Save())
+                {
+                    foreach (var order in resumed) order.paused = true;
+                    return;
+                }
+                if (!ReferenceEquals(registry, original)) return;
                 var next = record.factoryRepeatOrders.Find(x => x != null && !x.paused);
                 if (next == null) continue;
                 var recipe = FindFactoryRecipe(next.recipeId);
-                if (recipe == null) { next.paused = true; Save(); continue; }
+                if (recipe == null)
+                {
+                    next.paused = true;
+                    if (!Save()) { next.paused = false; return; }
+                    continue;
+                }
                 int batches = Math.Min(100, Math.Max(1, next.batchesPerCycle));
                 if (!next.continuous) batches = Math.Min(batches, Math.Max(0, next.remainingBatches));
-                if (batches <= 0) { record.factoryRepeatOrders.Remove(next); Save(); continue; }
+                if (batches <= 0)
+                {
+                    int index = record.factoryRepeatOrders.IndexOf(next);
+                    record.factoryRepeatOrders.RemoveAt(index);
+                    if (!Save()) { record.factoryRepeatOrders.Insert(index, next); return; }
+                    continue;
+                }
                 string result = StartFactoryJob(record, next.createdByProfile, recipe, batches, next.id);
                 if (!result.StartsWith("Factory job started:", StringComparison.Ordinal))
                 {
+                    if (!ReferenceEquals(registry, original)) return;
                     next.paused = true;
-                    Save();
+                    if (!Save()) { next.paused = false; return; }
                 }
             }
         }
